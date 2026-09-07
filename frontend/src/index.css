@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Dynamic per-company brand color - overwritten at runtime from company.branding */
+  --brand-color: #0a84ff;
+  --brand-color-dark: #0060df;
+}
+
+html {
+  font: 100%/1.5 -apple-system, BlinkMacSystemFont, 'SF Pro Text', Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  @apply bg-surface-subtle text-ink dark:bg-zinc-950 dark:text-zinc-100;
+  transition: background-color 300ms ease, color 300ms ease;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Large display text: tight leading, negative tracking (Apple typography rules) */
+.display-text {
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+/* Buttons/cards: respond on press, not release */
+.press-feedback {
+  transition: transform 100ms ease-out, opacity 100ms ease-out;
+}
+.press-feedback:active {
+  transform: scale(0.97);
+}
+
+/* Frosted glass chrome, used for sidebar/topbar/command palette */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  transition: background-color 300ms ease, border-color 300ms ease;
+}
+.dark .glass {
+  background: rgba(24, 24, 27, 0.72);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Soft floating aurora accents behind the dashboard content, Apple-style */
+@keyframes aurora-float {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(24px, -16px) scale(1.06);
+  }
+}
+.aurora-blob {
+  animation: aurora-float 14s ease-in-out infinite;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
