@@ -6,3 +6,5 @@ export const getAttendanceByDateApi = (date) =>
   axiosClient.get('/attendance', { params: { date } }).then((r) => r.data);
 export const getMemberAttendanceHistoryApi = (memberId) =>
   axiosClient.get(`/attendance/member/${memberId}`).then((r) => r.data);
+export const qrCheckInApi = (token) =>
+  axiosClient.post('/attendance/qr-checkin', { token }).then((r) => r.data);

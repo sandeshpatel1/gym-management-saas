@@ -8,6 +8,8 @@ import {
   FileBarChart,
   Building2,
   UsersRound,
+  QrCode,
+  Receipt,
   LogOut,
 } from 'lucide-react';
 import CompanyLogo from '../common/CompanyLogo';
@@ -58,11 +60,17 @@ export default function Sidebar() {
             <NavLink to="/attendance" className={linkClass}>
               <CalendarCheck size={18} /> Attendance
             </NavLink>
+            <NavLink to="/attendance/qr-scan" className={linkClass}>
+              <QrCode size={18} /> Scan QR
+            </NavLink>
             <NavLink to="/membership-plans" className={linkClass}>
               <CreditCard size={18} /> Membership Plans
             </NavLink>
             <NavLink to="/reports" className={linkClass}>
               <FileBarChart size={18} /> Reports
+            </NavLink>
+            <NavLink to="/billing" className={linkClass}>
+              <Receipt size={18} /> Billing
             </NavLink>
             {isOwner && (
               <NavLink to="/users" className={linkClass}>

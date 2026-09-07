@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Attendance = require('../models/Attendance');
 const Member = require('../models/Member');
+const { verify } = require('../utils/qrToken');
 
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
@@ -45,6 +46,57 @@ const markAttendance = asyncHandler(async (req, res) => {
   res.status(201).json({ success: true, data: record });
 });
 
+
+/**
+ * @desc  Mark attendance by scanning a member's QR code — no extra hardware
+ *        needed, a staff phone camera is enough.
+ * @route POST /api/attendance/qr-checkin
+ * @access Private (owner, manager, trainer)
+ */
+const qrCheckIn = asyncHandler(async (req, res) => {
+  const { token } = req.body;
+  const decoded = verify(token);
+  if (!decoded || decoded.companyId !== String(req.user.company)) {
+    res.status(400);
+    throw new Error('Invalid or expired QR code');
+  }
+
+  const member = await Member.findOne({ _id: decoded.memberId, company: req.user.company });
+  if (!member) {
+    res.status(404);
+    throw new Error('Member not found');
+  }
+
+  const attendanceDate = todayStr();
+  const existing = await Attendance.findOne({
+    company: req.user.company,
+    member: member._id,
+    date: attendanceDate,
+  });
+  if (existing) {
+    res.status(409);
+    throw new Error(`${member.fullName} is already marked present today`);
+  }
+
+  const record = await Attendance.create({
+    company: req.user.company,
+    member: member._id,
+    date: attendanceDate,
+    checkInTime: new Date(),
+    markedBy: req.user._id,
+    source: 'qr',
+  });
+
+  res.status(201).json({
+    success: true,
+    data: record,
+    member: { fullName: member.fullName, memberCode: member.memberCode },
+  });
+});
+
+
+
+
 /**
  * @desc  List attendance for a given date (defaults to today) - the daily roster
  * @route GET /api/attendance?date=YYYY-MM-DD
@@ -73,4 +125,4 @@ const getMemberAttendanceHistory = asyncHandler(async (req, res) => {
   res.json({ success: true, count: records.length, data: records });
 });
 
-module.exports = { markAttendance, getAttendanceByDate, getMemberAttendanceHistory };
+module.exports = { markAttendance, getAttendanceByDate, getMemberAttendanceHistory, qrCheckIn };

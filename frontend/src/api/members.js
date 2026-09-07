@@ -10,3 +10,5 @@ export const updateMemberApi = (id, payload) =>
   axiosClient.put(`/members/${id}`, payload).then((r) => r.data);
 export const renewMembershipApi = (id, payload) =>
   axiosClient.post(`/members/${id}/renew`, payload).then((r) => r.data);
+export const getMemberQrCodeApi = (id) =>
+  axiosClient.get(`/members/${id}/qrcode`, { responseType: 'blob' }).then((r) => r.data);

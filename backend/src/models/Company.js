@@ -47,6 +47,14 @@ const companySchema = new mongoose.Schema(
       attendanceGraceMinutes: { type: Number, default: 15 },
       invoicePrefix: { type: String, default: 'INV' },
     },
+    // GST + invoice presentation (feeds the PDF invoice header/footer)
+    invoiceSettings: {
+      gstin: { type: String, trim: true, uppercase: true, default: '' },
+      panNumber: { type: String, trim: true, uppercase: true, default: '' },
+      defaultGstRate: { type: Number, default: 18 }, // percent, editable per-payment too
+      termsAndConditions: [{ type: String, trim: true }],
+      footerNote: { type: String, trim: true, default: '' },
+    },
     isActive: {
       type: Boolean,
       default: true, // platform superadmin can disable a tenant (e.g. non-payment)
