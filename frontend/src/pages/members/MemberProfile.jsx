@@ -13,11 +13,6 @@ import { getMemberByIdApi, renewMembershipApi } from '../../api/members';
 import { getMemberAttendanceHistoryApi } from '../../api/attendance';
 import { getPlansApi } from '../../api/membershipPlans';
 import { exportMemberReportCard } from '../../api/reports';
-import MemberQrModal from '../../components/common/MemberQrModal';
-import { QrCode } from 'lucide-react';
-
-
-
 
 export default function MemberProfile() {
   const { id } = useParams();
@@ -29,7 +24,6 @@ export default function MemberProfile() {
   const [renewPlanId, setRenewPlanId] = useState('');
   const [renewAmount, setRenewAmount] = useState('');
   const [loading, setLoading] = useState(true);
-  const [qrOpen, setQrOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -115,6 +109,12 @@ export default function MemberProfile() {
               <Download size={15} /> PDF
             </Button>
           </div>
+
+          <p className="text-[11px] text-ink-tertiary mt-3 text-center">
+            Check-in is now done via the front-desk kiosk QR — {member.fullName.split(' ')[0]} just
+            enters their phone number ({member.phone}) or code ({member.memberCode}) on their phone
+            after scanning.
+          </p>
         </Card>
 
         <div className="lg:col-span-2 space-y-6">
@@ -183,12 +183,8 @@ export default function MemberProfile() {
           <Button className="w-full" onClick={handleRenew}>
             Confirm Renewal
           </Button>
-          <Button variant="secondary" className="flex-1" onClick={() => setQrOpen(true)}>
-  <QrCode size={15} /> QR
-</Button>
         </div>
       </Modal>
-      <MemberQrModal member={member} open={qrOpen} onClose={() => setQrOpen(false)} />
     </DashboardLayout>
   );
 }

@@ -8,7 +8,7 @@ import {
   FileBarChart,
   Building2,
   UsersRound,
-  QrCode,
+  Monitor,
   Receipt,
   PhoneCall,
   LogOut,
@@ -64,8 +64,8 @@ export default function Sidebar() {
             <NavLink to="/attendance" className={linkClass}>
               <CalendarCheck size={18} /> Attendance
             </NavLink>
-            <NavLink to="/attendance/qr-scan" className={linkClass}>
-              <QrCode size={18} /> Scan QR
+            <NavLink to="/attendance/kiosk" className={linkClass}>
+              <Monitor size={18} /> Attendance Kiosk
             </NavLink>
             <NavLink to="/membership-plans" className={linkClass}>
               <CreditCard size={18} /> Membership Plans

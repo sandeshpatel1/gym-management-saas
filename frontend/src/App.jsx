@@ -13,7 +13,8 @@ import MemberProfile from './pages/members/MemberProfile';
 import FollowUps from './pages/members/FollowUps';
 import MembershipPlans from './pages/membership/MembershipPlans';
 import AttendanceMarking from './pages/attendance/AttendanceMarking';
-import QRScanner from './pages/attendance/QRScanner';
+import Kiosk from './pages/attendance/Kiosk';
+import CheckIn from './pages/attendance/CheckIn';
 import Billing from './pages/billing/Billing';
 import RevenueReport from './pages/reports/RevenueReport';
 import UserManagement from './pages/users/UserManagement';
@@ -31,6 +32,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+
+      {/* Public - opened on a member's own phone after scanning the kiosk QR */}
+      <Route path="/checkin" element={<CheckIn />} />
 
       <Route path="/" element={<RootRedirect />} />
 
@@ -83,10 +87,10 @@ export default function App() {
         }
       />
       <Route
-        path="/attendance/qr-scan"
+        path="/attendance/kiosk"
         element={
           <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
-            <QRScanner />
+            <Kiosk />
           </ProtectedRoute>
         }
       />

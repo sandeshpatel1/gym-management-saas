@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Search, CheckCircle2, CalendarCheck } from 'lucide-react';
+import { Search, CheckCircle2, CalendarCheck, Monitor } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Card from '../../components/ui/Card';
 import Table from '../../components/ui/Table';
+import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import { searchMembersApi } from '../../api/members';
 import { markAttendanceApi, getAttendanceByDateApi } from '../../api/attendance';
@@ -14,6 +16,7 @@ export default function AttendanceMarking() {
   const [todayList, setTodayList] = useState([]);
   const [marking, setMarking] = useState(null);
   const today = new Date().toISOString().slice(0, 10);
+  const navigate = useNavigate();
 
   const loadToday = async () => {
     try {
@@ -65,11 +68,19 @@ export default function AttendanceMarking() {
   return (
     <DashboardLayout title="Attendance">
       <Card className="p-6 mb-6">
-        <p className="text-[14px] font-semibold text-ink mb-3">Mark Attendance</p>
+        <div className="flex items-start justify-between gap-4 mb-3 flex-wrap">
+          <p className="text-[14px] font-semibold text-ink">Mark Attendance (front-desk assist)</p>
+          <Button variant="secondary" size="sm" onClick={() => navigate('/attendance/kiosk')}>
+            <Monitor size={14} /> Launch Self Check-in Kiosk
+          </Button>
+        </div>
+        <p className="text-[12px] text-ink-tertiary mb-3">
+          Use search below only when a member forgets their phone/code — day to day, members
+          self check in via the kiosk QR code.
+        </p>
         <div className="relative mb-3">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
           <input
-            autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search member by name, phone, or code…"
@@ -115,10 +126,10 @@ export default function AttendanceMarking() {
           <EmptyState
             icon={CalendarCheck}
             title="No check-ins yet today"
-            description="Search a member above to mark them present."
+            description="Launch the kiosk so members can scan and check themselves in."
           />
         ) : (
-          <Table columns={['Member', 'Code', 'Check-in Time', 'Marked By']}>
+          <Table columns={['Member', 'Code', 'Check-in Time', 'Source', 'Marked By']}>
             {todayList.map((a) => (
               <tr key={a._id} className="border-b border-black/[0.04] last:border-0">
                 <td className="px-4 py-3 text-[14px] font-medium text-ink">{a.member?.fullName}</td>
@@ -126,6 +137,7 @@ export default function AttendanceMarking() {
                 <td className="px-4 py-3 text-[13px] text-ink-secondary">
                   {new Date(a.checkInTime).toLocaleTimeString()}
                 </td>
+                <td className="px-4 py-3 text-[13px] text-ink-secondary capitalize">{a.source}</td>
                 <td className="px-4 py-3 text-[13px] text-ink-secondary">{a.markedBy?.name}</td>
               </tr>
             ))}
