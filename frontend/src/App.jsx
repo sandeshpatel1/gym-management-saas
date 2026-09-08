@@ -20,6 +20,8 @@ import RevenueReport from './pages/reports/RevenueReport';
 import UserManagement from './pages/users/UserManagement';
 import Settings from './pages/settings/Settings';
 import Profile from './pages/profile/Profile';
+import MemberEdit from './pages/members/MemberEdit';
+import PhotoCapture from './pages/members/PhotoCapture';
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -35,6 +37,8 @@ export default function App() {
 
       {/* Public - opened on a member's own phone after scanning the kiosk QR */}
       <Route path="/checkin" element={<CheckIn />} />
+      {/* Public - opened on staff/member's phone after scanning the member photo QR */}
+    <Route path="/photo-capture" element={<PhotoCapture />} />
 
       <Route path="/" element={<RootRedirect />} />
 
@@ -142,6 +146,14 @@ export default function App() {
        </ProtectedRoute>
      }
    />
+   <Route
+  path="/members/:id/edit"
+  element={
+    <ProtectedRoute roles={['owner', 'manager']}>
+      <MemberEdit />
+    </ProtectedRoute>
+  }
+/>
 
       {/* --- Superadmin --- */}
       <Route

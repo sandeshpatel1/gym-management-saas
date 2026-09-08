@@ -20,6 +20,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
+import MemberSearchBar from '../../components/common/MemberSearchBar';
 
 const containerVariants = {
   hidden: {},
@@ -81,6 +82,9 @@ export default function Dashboard() {
 
   return (
     <DashboardLayout title="Dashboard">
+       <div className="mb-6">
+    <MemberSearchBar />
+  </div>
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {Array.from({ length: 5 }).map((_, i) => (

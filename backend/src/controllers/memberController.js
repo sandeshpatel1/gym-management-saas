@@ -5,6 +5,12 @@ const MembershipPlan = require('../models/MembershipPlan');
 const Payment = require('../models/Payment');
 const QRCode = require('qrcode');
 const { sign } = require('../utils/qrToken');
+const crypto = require('crypto');
+const MembershipExtension = require('../models/MembershipExtension');
+const PhotoUploadSession = require('../models/PhotoUploadSession');
+
+
+const PHOTO_SESSION_LIFETIME_MS = 5 * 60 * 1000;
 
 /**
  * Generate next member code
@@ -398,6 +404,127 @@ const getMemberQrCode = asyncHandler(async (req, res) => {
   res.send(qrCode);
 });
 
+
+/**
+ * @desc  Manually add N days to a member's membership, logged for audit.
+ *        Owner/manager only (enforced in the route).
+ * @route POST /api/members/:id/extend-membership
+ */
+const extendMembership = asyncHandler(async (req, res) => {
+  const { days, reason } = req.body;
+  const daysNum = Number(days);
+  if (!daysNum || daysNum <= 0) {
+    res.status(400);
+    throw new Error('days must be a positive number');
+  }
+
+  const member = await Member.findOne({ _id: req.params.id, company: req.user.company });
+  if (!member) {
+    res.status(404);
+    throw new Error('Member not found');
+  }
+
+  const now = new Date();
+  const base = member.membershipEnd && member.membershipEnd > now ? member.membershipEnd : now;
+  const previousEnd = member.membershipEnd || null;
+  const newEnd = new Date(base);
+  newEnd.setDate(newEnd.getDate() + daysNum);
+
+  await MembershipExtension.create({
+    company: req.user.company,
+    member: member._id,
+    daysAdded: daysNum,
+    previousEnd,
+    newEnd,
+    reason,
+    extendedBy: req.user._id,
+  });
+
+  member.membershipEnd = newEnd;
+  if (!member.membershipStart) member.membershipStart = now;
+  if (member.status !== 'active') member.status = 'active';
+  await member.save();
+
+  res.json({ success: true, data: member });
+});
+
+/**
+ * @desc  Audit history of manual membership extensions for a member
+ * @route GET /api/members/:id/extensions
+ */
+const getMemberExtensions = asyncHandler(async (req, res) => {
+  const extensions = await MembershipExtension.find({
+    company: req.user.company,
+    member: req.params.id,
+  })
+    .sort({ createdAt: -1 })
+    .populate('extendedBy', 'name');
+  res.json({ success: true, count: extensions.length, data: extensions });
+});
+
+/**
+ * @desc  Start a QR-scan photo handoff session for a member (owner/manager only)
+ * @route POST /api/members/:id/photo-session
+ */
+const createPhotoSession = asyncHandler(async (req, res) => {
+  const member = await Member.findOne({ _id: req.params.id, company: req.user.company });
+  if (!member) {
+    res.status(404);
+    throw new Error('Member not found');
+  }
+  const token = crypto.randomBytes(24).toString('hex');
+  const session = await PhotoUploadSession.create({
+    company: req.user.company,
+    member: member._id,
+    token,
+    createdBy: req.user._id,
+    expiresAt: new Date(Date.now() + PHOTO_SESSION_LIFETIME_MS),
+  });
+  res.status(201).json({ success: true, data: { token: session.token, expiresAt: session.expiresAt } });
+});
+
+/**
+ * @desc  Desktop polls this to see if the phone has submitted a selfie yet
+ * @route GET /api/members/photo-session/:token
+ */
+const getPhotoSessionResult = asyncHandler(async (req, res) => {
+  const session = await PhotoUploadSession.findOne({
+    token: req.params.token,
+    company: req.user.company,
+  });
+  if (!session) {
+    res.status(404);
+    throw new Error('Photo session not found');
+  }
+  res.json({
+    success: true,
+    data: {
+      status: session.status,
+      photoData: session.status === 'done' ? session.photoData : null,
+      expiresAt: session.expiresAt,
+    },
+  });
+});
+
+/**
+ * @desc  Renders the QR PNG for a photo session (same pattern as the kiosk QR)
+ * @route GET /api/members/photo-session/:token/qrcode
+ */
+const getPhotoSessionQr = asyncHandler(async (req, res) => {
+  const session = await PhotoUploadSession.findOne({
+    token: req.params.token,
+    company: req.user.company,
+  });
+  if (!session || session.expiresAt < new Date()) {
+    res.status(410);
+    throw new Error('This photo session has expired');
+  }
+  const captureUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/photo-capture?token=${session.token}`;
+  const qrCode = await QRCode.toBuffer(captureUrl, { width: 320, margin: 1 });
+  res.setHeader('Content-Type', 'image/png');
+  res.send(qrCode);
+});
+
 module.exports = {
   createMember,
   getMembers,
@@ -406,4 +533,9 @@ module.exports = {
   updateMember,
   renewMembership,
   getMemberQrCode,
+  extendMembership,
+  getMemberExtensions,
+  createPhotoSession,
+  getPhotoSessionResult,
+  getPhotoSessionQr,
 };

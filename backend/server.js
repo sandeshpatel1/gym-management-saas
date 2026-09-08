@@ -19,6 +19,7 @@ const paymentRoutes = require('./src/routes/paymentRoutes');
 const reportRoutes = require('./src/routes/reportRoutes');
 const followUpRoutes = require('./src/routes/followUpRoutes');
 const kioskRoutes = require('./src/routes/kioskRoutes');
+const photoSessionRoutes = require('./src/routes/photoSessionRoutes');
 
 const app = express();
 
@@ -39,6 +40,10 @@ const authLimiter = rateLimit({
   message: { success: false, message: 'Too many attempts, please try again later.' },
 });
 app.use('/api/auth', authLimiter);
+
+
+// ...
+app.use('/api/photo-sessions', photoSessionRoutes); // public — add alongside the other app.use('/api/...') lines
 
 // --- Health check ---
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'API is running' }));

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Download, RefreshCcw } from 'lucide-react';
+import { Download, RefreshCcw , Pencil} from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Card from '../../components/ui/Card';
 import Badge from '../../components/ui/Badge';
@@ -13,6 +13,8 @@ import { getMemberByIdApi, renewMembershipApi } from '../../api/members';
 import { getMemberAttendanceHistoryApi } from '../../api/attendance';
 import { getPlansApi } from '../../api/membershipPlans';
 import { exportMemberReportCard } from '../../api/reports';
+import { useNavigate } from 'react-router-dom'; // add useNavigate to the existing import // add Pencil
+import { useAuth } from '../../context/AuthContext';
 
 export default function MemberProfile() {
   const { id } = useParams();
@@ -24,6 +26,9 @@ export default function MemberProfile() {
   const [renewPlanId, setRenewPlanId] = useState('');
   const [renewAmount, setRenewAmount] = useState('');
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+const { user } = useAuth();
+const canManage = user?.role === 'owner' || user?.role === 'manager';
 
   const load = async () => {
     setLoading(true);
@@ -99,16 +104,18 @@ export default function MemberProfile() {
           </div>
 
           <div className="flex gap-2 mt-6">
-            <Button variant="secondary" className="flex-1" onClick={() => setRenewOpen(true)}>
-              <RefreshCcw size={15} /> Renew
-            </Button>
-            <Button
-              className="flex-1"
-              onClick={() => exportMemberReportCard(member._id, member.memberCode)}
-            >
-              <Download size={15} /> PDF
-            </Button>
-          </div>
+  {canManage && (
+    <Button variant="secondary" className="flex-1" onClick={() => navigate(`/members/${member._id}/edit`)}>
+      <Pencil size={15} /> Edit
+    </Button>
+  )}
+  <Button variant="secondary" className="flex-1" onClick={() => setRenewOpen(true)}>
+    <RefreshCcw size={15} /> Renew
+  </Button>
+  <Button className="flex-1" onClick={() => exportMemberReportCard(member._id, member.memberCode)}>
+    <Download size={15} /> PDF
+  </Button>
+</div>
 
           <p className="text-[11px] text-ink-tertiary mt-3 text-center">
             Check-in is now done via the front-desk kiosk QR — {member.fullName.split(' ')[0]} just
