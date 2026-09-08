@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 
-export default function StatCard({ label, value, sub, icon: Icon, accent = false }) {
+export default function StatCard({ label, value, sub, icon: Icon, accent = false, onClick }) {
   const ref = useRef(null);
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -26,10 +26,13 @@ export default function StatCard({ label, value, sub, icon: Icon, accent = false
       ref={ref}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onClick={onClick}
       style={{ rotateX, rotateY, transformPerspective: 800 }}
       whileHover={{ scale: 1.02 }}
       transition={{ type: 'spring', stiffness: 300, damping: 22 }}
-      className="bg-white/80 dark:bg-zinc-900/60 backdrop-blur-xl rounded-xl2 border border-black/[0.06] dark:border-white/[0.08] shadow-card p-5"
+      className={`bg-white/80 dark:bg-zinc-900/60 backdrop-blur-xl rounded-xl2 border border-black/[0.06] dark:border-white/[0.08] shadow-card p-5 ${
+        onClick ? 'cursor-pointer press-feedback' : ''
+      }`}
     >
       <div className="flex items-start justify-between">
         <div>

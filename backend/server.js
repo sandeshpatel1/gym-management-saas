@@ -17,6 +17,7 @@ const membershipRoutes = require('./src/routes/membershipRoutes');
 const attendanceRoutes = require('./src/routes/attendanceRoutes');
 const paymentRoutes = require('./src/routes/paymentRoutes');
 const reportRoutes = require('./src/routes/reportRoutes');
+const followUpRoutes = require('./src/routes/followUpRoutes');
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use('/api/membership-plans', membershipRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/follow-ups', followUpRoutes);
 
 // --- 404 + error handler (must be last) ---
 app.use(notFound);

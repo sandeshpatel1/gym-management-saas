@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users, UserCheck, CalendarCheck, IndianRupee, AlertTriangle } from 'lucide-react';
+import { Users, UserCheck, CalendarCheck, IndianRupee, AlertTriangle, PhoneCall } from 'lucide-react';
 import toast from 'react-hot-toast';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from '../../components/ui/StatCard';
 import Card from '../../components/ui/Card';
-import { getDashboardStatsApi } from '../../api/reports';
-import { getRevenueReportApi } from '../../api/reports';
+import Button from '../../components/ui/Button';
+import FollowUpPopup from '../../components/common/FollowUpPopup';
+import { useAuth } from '../../context/AuthContext';
+import { getDashboardStatsApi, getRevenueReportApi } from '../../api/reports';
+import { getFollowUpSummaryApi } from '../../api/followUps';
 import {
   ResponsiveContainer,
   LineChart,
@@ -27,9 +31,13 @@ const itemVariants = {
 };
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [revenueTrend, setRevenueTrend] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [followUpSummary, setFollowUpSummary] = useState(null);
+  const [popupOpen, setPopupOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -49,6 +57,27 @@ export default function Dashboard() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const { data } = await getFollowUpSummaryApi();
+        setFollowUpSummary(data);
+
+        if (data.total > 0) {
+          const today = new Date().toISOString().slice(0, 10);
+          const key = `followup_popup_${user.id}_${today}`;
+          if (!localStorage.getItem(key)) {
+            setPopupOpen(true);
+            localStorage.setItem(key, '1');
+          }
+        }
+      } catch {
+        /* silent - follow-up widget is non-critical for the dashboard */
+      }
+    })();
+  }, [user?.id]);
 
   return (
     <DashboardLayout title="Dashboard">
@@ -85,6 +114,8 @@ export default function Dashboard() {
                 label="Today's Attendance"
                 value={stats?.todaysAttendance ?? 0}
                 icon={CalendarCheck}
+                sub="Tap to see today's check-ins"
+                onClick={() => navigate('/attendance')}
               />
             </motion.div>
             <motion.div variants={itemVariants}>
@@ -104,6 +135,35 @@ export default function Dashboard() {
               />
             </motion.div>
           </motion.div>
+
+          {followUpSummary && followUpSummary.total > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 22 }}
+              className="mb-6"
+            >
+              <Card className="p-5 flex items-center justify-between border-amber-300/60 dark:border-amber-500/30 bg-amber-50/60 dark:bg-amber-500/[0.06]">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0">
+                    <PhoneCall size={18} />
+                  </div>
+                  <div>
+                    <p className="text-[14px] font-semibold text-ink dark:text-zinc-100">
+                      {followUpSummary.total} member{followUpSummary.total === 1 ? '' : 's'} need follow-up
+                    </p>
+                    <p className="text-[12px] text-ink-tertiary dark:text-zinc-500">
+                      {followUpSummary.counts.absent} absent 7+ days · {followUpSummary.counts.inactive} inactive ·{' '}
+                      {followUpSummary.counts.trial} trial / enquiry
+                    </p>
+                  </div>
+                </div>
+                <Button variant="secondary" onClick={() => navigate('/follow-ups')}>
+                  Review
+                </Button>
+              </Card>
+            </motion.div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -139,6 +199,8 @@ export default function Dashboard() {
           </motion.div>
         </>
       )}
+
+      <FollowUpPopup open={popupOpen} onClose={() => setPopupOpen(false)} summary={followUpSummary} />
     </DashboardLayout>
   );
 }

@@ -10,6 +10,7 @@ import GlobalUsers from './pages/users/Globalusers';
 import MemberList from './pages/members/MemberList';
 import MemberForm from './pages/members/MemberForm';
 import MemberProfile from './pages/members/MemberProfile';
+import FollowUps from './pages/members/FollowUps';
 import MembershipPlans from './pages/membership/MembershipPlans';
 import AttendanceMarking from './pages/attendance/AttendanceMarking';
 import QRScanner from './pages/attendance/QRScanner';
@@ -17,6 +18,7 @@ import Billing from './pages/billing/Billing';
 import RevenueReport from './pages/reports/RevenueReport';
 import UserManagement from './pages/users/UserManagement';
 import Settings from './pages/settings/Settings';
+import Profile from './pages/profile/Profile';
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -61,6 +63,14 @@ export default function App() {
         element={
           <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
             <MemberProfile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/follow-ups"
+        element={
+          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+            <FollowUps />
           </ProtectedRoute>
         }
       />
@@ -120,6 +130,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+         <Route
+     path="/profile"
+     element={
+       <ProtectedRoute>
+         <Profile />
+       </ProtectedRoute>
+     }
+   />
 
       {/* --- Superadmin --- */}
       <Route

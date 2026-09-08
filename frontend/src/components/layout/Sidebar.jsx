@@ -10,6 +10,7 @@ import {
   UsersRound,
   QrCode,
   Receipt,
+  PhoneCall,
   LogOut,
 } from 'lucide-react';
 import CompanyLogo from '../common/CompanyLogo';
@@ -56,6 +57,9 @@ export default function Sidebar() {
             </NavLink>
             <NavLink to="/members/new" className={linkClass}>
               <UserPlus size={18} /> Register Member
+            </NavLink>
+            <NavLink to="/follow-ups" className={linkClass}>
+              <PhoneCall size={18} /> Follow-ups
             </NavLink>
             <NavLink to="/attendance" className={linkClass}>
               <CalendarCheck size={18} /> Attendance
