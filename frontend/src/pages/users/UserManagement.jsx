@@ -11,9 +11,11 @@ import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import EmptyState from '../../components/ui/EmptyState';
+import { useAuth } from '../../context/AuthContext';
 import { getUsersApi, createUserApi, updateUserApi } from '../../api/users';
 
 export default function UserManagement() {
+  const { effectiveCompany } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -35,11 +37,21 @@ export default function UserManagement() {
 
   useEffect(() => {
     load();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveCompany?.id]);
 
   const onCreate = async (values) => {
     try {
-      await createUserApi(values);
+      // userRoutes.js has no requireCompanyScope middleware, and createUser
+      // reads `company` from the request BODY (not the ?company= query
+      // param the axios interceptor adds automatically). So when a
+      // superadmin is managing a gym, we must attach it here explicitly —
+      // real owners/managers don't need this, the backend uses their own
+      // req.user.company instead.
+      const payload = effectiveCompany?.id
+        ? { ...values, company: effectiveCompany.id }
+        : values;
+      await createUserApi(payload);
       toast.success('Staff account created');
       setModalOpen(false);
       reset();

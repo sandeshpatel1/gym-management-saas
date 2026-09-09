@@ -7,6 +7,15 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('gym_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
+
+  // If a superadmin is currently "managing" a gym, scope every request to
+  // that gym automatically (the backend reads ?company=<id> for superadmin
+  // requests on company-scoped routes).
+  const managingCompanyId = sessionStorage.getItem('gym_managing_company_id');
+  if (managingCompanyId) {
+    config.params = { ...(config.params || {}), company: managingCompanyId };
+  }
+
   return config;
 });
 

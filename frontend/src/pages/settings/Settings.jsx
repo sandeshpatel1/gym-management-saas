@@ -10,47 +10,39 @@ import { useAuth } from '../../context/AuthContext';
 import { updateCompanyApi } from '../../api/companies';
 
 export default function Settings() {
-  const { user, setUser } = useAuth();
+  const { user, setUser, effectiveCompany, managingCompany, startManaging } = useAuth();
   const [saving, setSaving] = useState(false);
   const { register, handleSubmit, reset } = useForm();
 
   useEffect(() => {
-    if (user?.company) {
+    if (effectiveCompany) {
       reset({
-        name: user.company.name,
-        logoUrl: user.company.branding?.logoUrl || '',
-        primaryColor: user.company.branding?.primaryColor || '#0A84FF',
-        tagline: user.company.branding?.tagline || '',
-        address: user.company.contact?.address || '',
-        city: user.company.contact?.city || '',
-        state: user.company.contact?.state || '',
-        pincode: user.company.contact?.pincode || '',
-        phone: user.company.contact?.phone || '',
-        email: user.company.contact?.email || '',
-        gstin: user.company.invoiceSettings?.gstin || '',
-        defaultGstRate: user.company.invoiceSettings?.defaultGstRate ?? 18,
-        termsAndConditions: (user.company.invoiceSettings?.termsAndConditions || []).join('\n'),
+        name: effectiveCompany.name,
+        logoUrl: effectiveCompany.branding?.logoUrl || '',
+        primaryColor: effectiveCompany.branding?.primaryColor || '#0A84FF',
+        tagline: effectiveCompany.branding?.tagline || '',
+        address: effectiveCompany.contact?.address || '',
+        city: effectiveCompany.contact?.city || '',
+        state: effectiveCompany.contact?.state || '',
+        pincode: effectiveCompany.contact?.pincode || '',
+        phone: effectiveCompany.contact?.phone || '',
+        email: effectiveCompany.contact?.email || '',
+        gstin: effectiveCompany.invoiceSettings?.gstin || '',
+        defaultGstRate: effectiveCompany.invoiceSettings?.defaultGstRate ?? 18,
+        termsAndConditions: (effectiveCompany.invoiceSettings?.termsAndConditions || []).join('\n'),
       });
     }
-  }, [user, reset]);
+  }, [effectiveCompany, reset]);
 
   const onSave = async (values) => {
     setSaving(true);
     try {
-      const { data } = await updateCompanyApi(user.company.id, {
+      const { data } = await updateCompanyApi(effectiveCompany.id, {
         name: values.name,
-        branding: {
-          logoUrl: values.logoUrl,
-          primaryColor: values.primaryColor,
-          tagline: values.tagline,
-        },
+        branding: { logoUrl: values.logoUrl, primaryColor: values.primaryColor, tagline: values.tagline },
         contact: {
-          address: values.address,
-          city: values.city,
-          state: values.state,
-          pincode: values.pincode,
-          phone: values.phone,
-          email: values.email,
+          address: values.address, city: values.city, state: values.state,
+          pincode: values.pincode, phone: values.phone, email: values.email,
         },
         invoiceSettings: {
           gstin: values.gstin,
@@ -60,9 +52,14 @@ export default function Settings() {
             : [],
         },
       });
-      const updatedUser = { ...user, company: { ...user.company, ...data } };
-      localStorage.setItem('gym_user', JSON.stringify(updatedUser));
-      setUser(updatedUser);
+  
+      if (managingCompany) {
+        startManaging({ id: data._id, name: data.name, code: data.code, branding: data.branding, ...data });
+      } else {
+        const updatedUser = { ...user, company: { ...user.company, ...data } };
+        localStorage.setItem('gym_user', JSON.stringify(updatedUser));
+        setUser(updatedUser);
+      }
       document.documentElement.style.setProperty('--brand-color', data.branding.primaryColor);
       toast.success('Settings updated — this feeds every invoice automatically');
     } catch (err) {
@@ -130,9 +127,9 @@ export default function Settings() {
         <Card className="p-6 h-fit">
           <p className="text-[14px] font-semibold text-ink mb-4">Preview</p>
           <div className="flex items-center gap-3 p-4 bg-surface-subtle rounded-xl">
-            <CompanyLogo company={user?.company} size={48} />
+            <CompanyLogo company={effectiveCompany} size={48} />
             <div>
-              <p className="text-[14px] font-semibold text-ink">{user?.company?.name}</p>
+              <p className="text-[14px] font-semibold text-ink">{effectiveCompany?.name}</p>
               <p className="text-[12px] text-ink-tertiary">This is how your logo appears in the sidebar & invoices</p>
             </div>
           </div>

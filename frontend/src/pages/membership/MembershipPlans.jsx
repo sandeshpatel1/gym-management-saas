@@ -14,7 +14,7 @@ import { getPlansApi, createPlanApi, deletePlanApi } from '../../api/membershipP
 
 export default function MembershipPlans() {
   const { user } = useAuth();
-  const isOwner = user?.role === 'owner';
+  const { isEffectiveOwner: isOwner } = useAuth();
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);

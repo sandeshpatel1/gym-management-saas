@@ -40,8 +40,14 @@ const protect = asyncHandler(async (req, res, next) => {
 /**
  * authorize(...roles): route-level RBAC guard.
  * Usage: router.post('/', protect, authorize('owner', 'manager'), createX)
+ *
+ * Superadmin ALWAYS passes this check, regardless of which roles are listed.
+ * This is what gives the platform admin full owner/manager/trainer-level
+ * access to every gym's data once requireCompanyScope has resolved which
+ * company they're acting on (see below).
  */
 const authorize = (...roles) => (req, res, next) => {
+  if (req.user?.role === 'superadmin') return next();
   if (!req.user || !roles.includes(req.user.role)) {
     res.status(403);
     throw new Error(`Role '${req.user?.role}' is not permitted to perform this action`);
@@ -50,10 +56,27 @@ const authorize = (...roles) => (req, res, next) => {
 };
 
 /**
- * requireCompanyScope: blocks superadmin-only accounts from tenant-data routes
- * (they manage the Company Master, not member/attendance/revenue data directly).
+ * requireCompanyScope: resolves which company a request should be scoped to.
+ * - Normal staff: always their own req.user.company.
+ * - Superadmin: has no company of their own, so they MUST tell us which gym
+ *   they're managing via `?company=<id>` (the frontend sends this
+ *   automatically once a superadmin picks "Manage" on a gym). We stamp it
+ *   onto req.user.company for the rest of this request only, so every
+ *   existing controller (which reads req.user.company) works completely
+ *   unmodified for the superadmin too.
  */
 const requireCompanyScope = (req, res, next) => {
+  if (req.user.role === 'superadmin') {
+    const companyId = req.query.company || req.headers['x-company-id'];
+    if (!companyId) {
+      res.status(400);
+      throw new Error('Select a gym to manage first (missing company scope)');
+    }
+    req.user.company = companyId;
+    req.isSuperadminActingAs = true;
+    return next();
+  }
+
   if (!req.user.company) {
     res.status(403);
     throw new Error('This action requires an account scoped to a company');

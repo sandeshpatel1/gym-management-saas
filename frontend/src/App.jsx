@@ -38,14 +38,14 @@ export default function App() {
       {/* Public - opened on a member's own phone after scanning the kiosk QR */}
       <Route path="/checkin" element={<CheckIn />} />
       {/* Public - opened on staff/member's phone after scanning the member photo QR */}
-    <Route path="/photo-capture" element={<PhotoCapture />} />
+      <Route path="/photo-capture" element={<PhotoCapture />} />
 
       <Route path="/" element={<RootRedirect />} />
 
       <Route
         path="/dashboard"
         element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
             <Dashboard />
           </ProtectedRoute>
         }
@@ -53,7 +53,7 @@ export default function App() {
       <Route
         path="/members"
         element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
             <MemberList />
           </ProtectedRoute>
         }
@@ -61,7 +61,7 @@ export default function App() {
       <Route
         path="/members/new"
         element={
-          <ProtectedRoute roles={['owner', 'manager']}>
+          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
             <MemberForm />
           </ProtectedRoute>
         }
@@ -69,7 +69,7 @@ export default function App() {
       <Route
         path="/members/:id"
         element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
             <MemberProfile />
           </ProtectedRoute>
         }
@@ -77,7 +77,7 @@ export default function App() {
       <Route
         path="/follow-ups"
         element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
             <FollowUps />
           </ProtectedRoute>
         }
@@ -85,7 +85,7 @@ export default function App() {
       <Route
         path="/attendance"
         element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
             <AttendanceMarking />
           </ProtectedRoute>
         }
@@ -93,7 +93,7 @@ export default function App() {
       <Route
         path="/attendance/kiosk"
         element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
             <Kiosk />
           </ProtectedRoute>
         }
@@ -101,7 +101,7 @@ export default function App() {
       <Route
         path="/membership-plans"
         element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer']}>
+          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
             <MembershipPlans />
           </ProtectedRoute>
         }
@@ -109,7 +109,7 @@ export default function App() {
       <Route
         path="/reports"
         element={
-          <ProtectedRoute roles={['owner', 'manager']}>
+          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
             <RevenueReport />
           </ProtectedRoute>
         }
@@ -117,7 +117,7 @@ export default function App() {
       <Route
         path="/billing"
         element={
-          <ProtectedRoute roles={['owner', 'manager']}>
+          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
             <Billing />
           </ProtectedRoute>
         }
@@ -125,7 +125,7 @@ export default function App() {
       <Route
         path="/users"
         element={
-          <ProtectedRoute roles={['owner']}>
+          <ProtectedRoute roles={['owner', 'superadmin']} requireCompanyContext>
             <UserManagement />
           </ProtectedRoute>
         }
@@ -133,29 +133,29 @@ export default function App() {
       <Route
         path="/settings"
         element={
-          <ProtectedRoute roles={['owner', 'manager']}>
+          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
             <Settings />
           </ProtectedRoute>
         }
       />
-         <Route
-     path="/profile"
-     element={
-       <ProtectedRoute>
-         <Profile />
-       </ProtectedRoute>
-     }
-   />
-   <Route
-  path="/members/:id/edit"
-  element={
-    <ProtectedRoute roles={['owner', 'manager']}>
-      <MemberEdit />
-    </ProtectedRoute>
-  }
-/>
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/members/:id/edit"
+        element={
+          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
+            <MemberEdit />
+          </ProtectedRoute>
+        }
+      />
 
-      {/* --- Superadmin --- */}
+      {/* --- Superadmin (platform-wide, not tied to one gym) --- */}
       <Route
         path="/company-master"
         element={

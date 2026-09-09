@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Plus, Building2, Pencil, UsersRound } from 'lucide-react';
+import { Plus, Building2, Pencil, UsersRound, LogInIcon } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Card from '../../components/ui/Card';
 import Table from '../../components/ui/Table';
@@ -28,6 +29,13 @@ export default function CompanyMaster() {
 
   const createForm = useForm();
   const editForm = useForm();
+
+  const { startManaging } = useAuth();
+
+const manage = (company) => {
+  startManaging(company);
+  navigate('/dashboard');
+};
 
   const load = async () => {
     setLoading(true);
@@ -162,6 +170,9 @@ export default function CompanyMaster() {
                     <Button variant="secondary" size="sm" onClick={() => navigate(`/superadmin/users?company=${c._id}`)}>
                       <UsersRound size={13} /> Users
                     </Button>
+                    <Button size="sm" onClick={() => manage(c)}>
+                    <LogInIcon size={13} /> Manage
+                  </Button>
                     <Button variant="secondary" size="sm" onClick={() => openEdit(c)}>
                       <Pencil size={13} /> Edit
                     </Button>
