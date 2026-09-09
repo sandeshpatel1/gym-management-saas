@@ -64,6 +64,10 @@ app.use('/api/kiosk', kioskRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
+const platformSettingsRoutes = require('./src/routes/platformSettingsRoutes');
+// ...
+app.use('/api/platform-settings', platformSettingsRoutes); 
+
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {

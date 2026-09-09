@@ -8,11 +8,22 @@ import Button from '../../components/ui/Button';
 import CompanyLogo from '../../components/common/CompanyLogo';
 import { useAuth } from '../../context/AuthContext';
 import { updateCompanyApi } from '../../api/companies';
+import { getPlatformPaymentMethodsApi } from '../../api/platformSettings';
 
 export default function Settings() {
   const { user, setUser, effectiveCompany, managingCompany, startManaging } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [platformMethods, setPlatformMethods] = useState([]);
+  const [enabledMethods, setEnabledMethods] = useState([]);
   const { register, handleSubmit, reset } = useForm();
+
+  useEffect(() => {
+    getPlatformPaymentMethodsApi()
+      .then(({ data }) => setPlatformMethods(data.filter((m) => m.enabled)))
+      .catch(() => {
+        /* if this fails, the payment-methods checklist just won't render — everything else still works */
+      });
+  }, []);
 
   useEffect(() => {
     if (effectiveCompany) {
@@ -30,9 +41,16 @@ export default function Settings() {
         gstin: effectiveCompany.invoiceSettings?.gstin || '',
         defaultGstRate: effectiveCompany.invoiceSettings?.defaultGstRate ?? 18,
         termsAndConditions: (effectiveCompany.invoiceSettings?.termsAndConditions || []).join('\n'),
+        upiVpa: effectiveCompany.paymentSettings?.upi?.vpa || '',
+        upiPayeeName: effectiveCompany.paymentSettings?.upi?.payeeName || effectiveCompany.name || '',
       });
+      setEnabledMethods(effectiveCompany.paymentSettings?.enabledMethods || ['cash']);
     }
   }, [effectiveCompany, reset]);
+
+  const toggleMethod = (key) => {
+    setEnabledMethods((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  };
 
   const onSave = async (values) => {
     setSaving(true);
@@ -51,8 +69,12 @@ export default function Settings() {
             ? values.termsAndConditions.split('\n').map((t) => t.trim()).filter(Boolean)
             : [],
         },
+        paymentSettings: {
+          upi: { vpa: values.upiVpa.trim(), payeeName: values.upiPayeeName.trim() },
+          enabledMethods,
+        },
       });
-  
+
       if (managingCompany) {
         startManaging({ id: data._id, name: data.name, code: data.code, branding: data.branding, ...data });
       } else {
@@ -61,7 +83,7 @@ export default function Settings() {
         setUser(updatedUser);
       }
       document.documentElement.style.setProperty('--brand-color', data.branding.primaryColor);
-      toast.success('Settings updated — this feeds every invoice automatically');
+      toast.success('Settings updated — this feeds every invoice and payment screen automatically');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not save settings');
     } finally {
@@ -116,6 +138,38 @@ export default function Settings() {
                   placeholder="Membership fees are non-refundable..."
                 />
               </label>
+            </div>
+
+            <div className="pt-4 border-t border-black/[0.06]">
+              <p className="text-[14px] font-semibold text-ink mb-1">Payment Methods & UPI</p>
+              <p className="text-[12px] text-ink-tertiary mb-4">
+                Choose which methods your front desk can accept, and set your UPI ID so members can
+                scan-and-pay directly during registration or when collecting dues.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <Input label="UPI ID (VPA)" placeholder="yourgym@okhdfcbank" {...register('upiVpa')} />
+                <Input label="Payee Name shown to members" {...register('upiPayeeName')} />
+              </div>
+              {platformMethods.length === 0 ? (
+                <p className="text-[12px] text-ink-tertiary">No platform payment methods configured yet.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {platformMethods.map((m) => (
+                    <button
+                      type="button"
+                      key={m.key}
+                      onClick={() => toggleMethod(m.key)}
+                      className={`px-3.5 py-2 rounded-xl text-[13px] font-medium press-feedback transition-colors ${
+                        enabledMethods.includes(m.key)
+                          ? 'bg-brand text-white'
+                          : 'bg-surface-subtle text-ink-secondary border border-black/10'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Button type="submit" loading={saving}>

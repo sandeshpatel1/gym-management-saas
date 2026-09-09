@@ -22,6 +22,8 @@ import Settings from './pages/settings/Settings';
 import Profile from './pages/profile/Profile';
 import MemberEdit from './pages/members/MemberEdit';
 import PhotoCapture from './pages/members/PhotoCapture';
+import PlatformPaymentSettings from './pages/superadmin/PlatformPaymentSettings'; // add with other imports
+
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -180,6 +182,14 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+  path="/superadmin/payment-methods"
+  element={
+    <ProtectedRoute roles={['superadmin']}>
+      <PlatformPaymentSettings />
+    </ProtectedRoute>
+  }
+/>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

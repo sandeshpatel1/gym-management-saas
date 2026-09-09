@@ -8,6 +8,7 @@ const { sign } = require('../utils/qrToken');
 const crypto = require('crypto');
 const MembershipExtension = require('../models/MembershipExtension');
 const PhotoUploadSession = require('../models/PhotoUploadSession');
+const { computeBilling } = require('../utils/billing'); // add near the top with the other requires
 
 
 const PHOTO_SESSION_LIFETIME_MS = 5 * 60 * 1000;
@@ -43,6 +44,10 @@ const createMember = asyncHandler(async (req, res) => {
     planId,
     amountPaid,
     paymentMethod,
+    invoiceAmount,   // NEW - what's actually billed (defaults to plan price)
+    gstRate,         // NEW - percent, defaults to company's default rate if sent
+    discountAmount,  // NEW
+    dueDate,         // NEW - required by frontend when this is a partial payment
   } = req.body;
 
   if (!fullName || !phone || !gender || !dob) {
@@ -50,10 +55,7 @@ const createMember = asyncHandler(async (req, res) => {
     throw new Error('fullName, phone, gender and dob are required');
   }
 
-  const memberCode = await nextMemberCode(
-    req.user.company,
-    req.body.companyCodePrefix
-  );
+  const memberCode = await nextMemberCode(req.user.company, req.body.companyCodePrefix);
 
   const member = new Member({
     company: req.user.company,
@@ -71,11 +73,7 @@ const createMember = asyncHandler(async (req, res) => {
   });
 
   if (planId) {
-    const plan = await MembershipPlan.findOne({
-      _id: planId,
-      company: req.user.company,
-    });
-
+    const plan = await MembershipPlan.findOne({ _id: planId, company: req.user.company });
     if (!plan) {
       res.status(404);
       throw new Error('Selected membership plan not found');
@@ -83,7 +81,6 @@ const createMember = asyncHandler(async (req, res) => {
 
     const startDate = new Date();
     const endDate = new Date(startDate);
-
     endDate.setDate(endDate.getDate() + plan.durationInDays);
 
     member.currentPlan = plan._id;
@@ -94,9 +91,18 @@ const createMember = asyncHandler(async (req, res) => {
     let paymentDoc = null;
 
     if (amountPaid !== undefined) {
-      const invoiceCount = await Payment.countDocuments({
-        company: req.user.company,
+      const invoiceCount = await Payment.countDocuments({ company: req.user.company });
+      const billing = computeBilling({
+        amount: amountPaid,
+        invoiceAmount: invoiceAmount ?? plan.price,
+        gstRate,
+        discountAmount,
       });
+
+      if (billing.amountDue > 0 && !dueDate) {
+        res.status(400);
+        throw new Error('A due date is required when the amount received is less than the amount billed');
+      }
 
       paymentDoc = await Payment.create({
         company: req.user.company,
@@ -106,6 +112,8 @@ const createMember = asyncHandler(async (req, res) => {
         amount: amountPaid,
         method: paymentMethod || 'cash',
         receivedBy: req.user._id,
+        dueDate: billing.amountDue > 0 ? dueDate : undefined,
+        ...billing,
       });
     }
 
@@ -120,10 +128,7 @@ const createMember = asyncHandler(async (req, res) => {
 
   await member.save();
 
-  res.status(201).json({
-    success: true,
-    data: member,
-  });
+  res.status(201).json({ success: true, data: member });
 });
 
 /**

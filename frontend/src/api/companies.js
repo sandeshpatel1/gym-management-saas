@@ -7,3 +7,7 @@ export const updateCompanyApi = (id, payload) =>
   axiosClient.put(`/companies/${id}`, payload).then((r) => r.data);
 export const setCompanyStatusApi = (id, isActive) =>
   axiosClient.patch(`/companies/${id}/status`, { isActive }).then((r) => r.data);
+  export const getUpiQrPreviewApi = (companyId, amount, note) =>
+  axiosClient
+    .get(`/companies/${companyId}/upi-qr`, { params: { amount, note }, responseType: 'blob' })
+    .then((r) => r.data);

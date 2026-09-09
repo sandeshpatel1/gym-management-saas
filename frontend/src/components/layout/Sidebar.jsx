@@ -13,6 +13,7 @@ import {
   PhoneCall,
   Settings as SettingsIcon,
   LogOut,
+  Wallet,
 } from 'lucide-react';
 import CompanyLogo from '../common/CompanyLogo';
 import { useAuth } from '../../context/AuthContext';
@@ -70,15 +71,18 @@ export default function Sidebar() {
             <NavLink to="/members/new" className={linkClass}>
               <UserPlus size={18} /> Register Member
             </NavLink>
+            <NavLink to="/superadmin/payment-methods" className={linkClass}>
+              <Wallet size={18} /> Payment Methods
+            </NavLink>
             <NavLink to="/follow-ups" className={linkClass}>
               <PhoneCall size={18} /> Follow-ups
             </NavLink>
             <NavLink to="/attendance" className={linkClass}>
               <CalendarCheck size={18} /> Attendance
             </NavLink>
-            <NavLink to="/attendance/kiosk" className={linkClass}>
+            {/* <NavLink to="/attendance/kiosk" className={linkClass}>
               <Monitor size={18} /> Attendance Kiosk
-            </NavLink>
+            </NavLink> */}
             <NavLink to="/membership-plans" className={linkClass}>
               <CreditCard size={18} /> Membership Plans
             </NavLink>

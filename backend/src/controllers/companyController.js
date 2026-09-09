@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Company = require('../models/Company');
 const User = require('../models/User');
+const QRCode = require('qrcode');
 
 /**
  * @desc  List all companies (platform-wide Company Master table)
@@ -35,8 +36,6 @@ const createCompany = asyncHandler(async (req, res) => {
     throw new Error('This company code is already taken, please choose another');
   }
 
-  // If any owner field was provided, require all three so we never create a
-  // half-broken login.
   const wantsOwner = ownerName || ownerEmail || ownerPassword;
   if (wantsOwner && (!ownerName || !ownerEmail || !ownerPassword)) {
     res.status(400);
@@ -94,15 +93,10 @@ const getCompanyById = asyncHandler(async (req, res) => {
 
 /**
  * @desc  Update company - name, contact, branding, settings, subscription.
- *        Accepts any of these nested objects in the body, so this single
- *        endpoint is what the superadmin Edit Gym form (and the owner's own
- *        Settings page) both use to change anything about a gym without
- *        touching the database directly.
  * @route PUT /api/companies/:id
  * @access Private (superadmin, or owner of that company)
  */
 const updateCompany = asyncHandler(async (req, res) => {
-  // Non-superadmin users may only touch their own company
   if (req.user.role !== 'superadmin' && String(req.user.company) !== req.params.id) {
     res.status(403);
     throw new Error('You can only update your own company');
@@ -140,4 +134,40 @@ const setCompanyStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, data: company });
 });
 
-module.exports = { getCompanies, createCompany, getCompanyById, updateCompany, setCompanyStatus };
+/**
+ * @desc  Renders a scannable UPI deep-link QR (upi://pay?...) for THIS gym's
+ *        configured VPA, for a given amount. No money moves through this
+ *        server — it just deep-links into whatever UPI app the member has.
+ * @route GET /api/companies/:id/upi-qr?amount=&note=
+ * @access Private (any tenant-scoped user for their own gym)
+ */
+const getUpiQrPreview = asyncHandler(async (req, res) => {
+  const company = await Company.findById(req.params.id);
+  if (!company) {
+    res.status(404);
+    throw new Error('Company not found');
+  }
+  const vpa = company.paymentSettings?.upi?.vpa;
+  if (!vpa) {
+    res.status(400);
+    throw new Error('UPI ID is not configured for this gym yet — set it under Gym Settings');
+  }
+  const amount = Number(req.query.amount || 0);
+  const note = (req.query.note || 'Payment').slice(0, 40);
+  const payeeName = company.paymentSettings?.upi?.payeeName || company.name;
+
+  const upiUri = `upi://pay?pa=${encodeURIComponent(vpa)}&pn=${encodeURIComponent(payeeName)}&am=${amount.toFixed(2)}&cu=INR&tn=${encodeURIComponent(note)}`;
+  const qrBuffer = await QRCode.toBuffer(upiUri, { width: 300, margin: 1 });
+
+  res.setHeader('Content-Type', 'image/png');
+  res.send(qrBuffer);
+});
+
+module.exports = {
+  getCompanies,
+  createCompany,
+  getCompanyById,
+  updateCompany,
+  setCompanyStatus,
+  getUpiQrPreview,
+};

@@ -5,6 +5,7 @@ const {
   getCompanyById,
   updateCompany,
   setCompanyStatus,
+  getUpiQrPreview,
 } = require('../controllers/companyController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -18,5 +19,6 @@ router.post('/', protect, authorize('superadmin'), createCompany);
 router.get('/:id', protect, getCompanyById);
 router.put('/:id', protect, authorize('superadmin', 'owner'), updateCompany);
 router.patch('/:id/status', protect, authorize('superadmin'), setCompanyStatus);
+router.get('/:id/upi-qr', protect, getUpiQrPreview);
 
 module.exports = router;

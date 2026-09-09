@@ -63,6 +63,13 @@ const companySchema = new mongoose.Schema(
       plan: { type: String, enum: ['trial', 'basic', 'pro', 'enterprise'], default: 'trial' },
       validTill: { type: Date },
     },
+    paymentSettings: {
+      upi: {
+        vpa: { type: String, trim: true, default: '' },        // e.g. "ironparadise@okhdfcbank"
+        payeeName: { type: String, trim: true, default: '' },
+      },
+      enabledMethods: [{ type: String }], // subset of the platform's method keys this gym accepts
+    },
   },
   { timestamps: true }
 );

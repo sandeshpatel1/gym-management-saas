@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 const Payment = require('../models/Payment');
 const Company = require('../models/Company');
 const { drawInvoice } = require('../utils/invoicePdf');
+const { computeBilling } = require('../utils/billing');
 
 // @route GET /api/payments
 const getPayments = asyncHandler(async (req, res) => {
@@ -38,28 +39,6 @@ const getPayments = asyncHandler(async (req, res) => {
  * it defaults to `amount` (fully paid, no dues, no tax). `discountAmount`
  * reduces the billed total before dues are computed.
  */
-const computeBilling = ({ amount, invoiceAmount, gstRate, discountAmount }) => {
-  const rate = Number(gstRate || 0);
-  const discount = Number(discountAmount || 0);
-  let billed = invoiceAmount !== undefined ? Number(invoiceAmount) : Number(amount);
-  billed = Math.max(0, +(billed - discount).toFixed(2));
-  const taxableAmount = rate > 0 ? +(billed / (1 + rate / 100)).toFixed(2) : billed;
-  const taxTotal = +(billed - taxableAmount).toFixed(2);
-  const cgstAmount = +(taxTotal / 2).toFixed(2);
-  const sgstAmount = +(taxTotal - cgstAmount).toFixed(2);
-  const amountDue = Math.max(0, +(billed - Number(amount)).toFixed(2));
-  const status = amountDue <= 0 ? 'paid' : Number(amount) > 0 ? 'partial' : 'pending';
-  return {
-    taxableAmount,
-    gstRate: rate,
-    cgstAmount,
-    sgstAmount,
-    invoiceAmount: billed,
-    discountAmount: discount,
-    amountDue,
-    status,
-  };
-};
 
 // @route POST /api/payments  (standalone payment, not tied to registration/renewal flow)
 const createPayment = asyncHandler(async (req, res) => {
