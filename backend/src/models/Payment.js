@@ -31,9 +31,22 @@ const paymentSchema = new mongoose.Schema(
     gstRate: { type: Number, default: 0 }, // percent, e.g. 18
     cgstAmount: { type: Number, default: 0 },
     sgstAmount: { type: Number, default: 0 },
+    discountAmount: { type: Number, default: 0, min: 0 },
     amountDue: { type: Number, default: 0 },
     dueDate: { type: Date },
     status: { type: String, enum: ['paid', 'partial', 'pending', 'refunded'], default: 'paid' },
+
+    // --- Refunds ---
+    refund: {
+      amount: { type: Number, default: 0 },
+      reason: { type: String, trim: true, maxlength: 300 },
+      refundedAt: { type: Date },
+      refundedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    },
+
+    // --- Reminders (lightweight log, no separate collection needed) ---
+    lastReminderAt: { type: Date },
+    reminderCount: { type: Number, default: 0 },
   },
   { timestamps: true }
 );
@@ -59,5 +72,6 @@ paymentSchema.index({ company: 1, invoiceNumber: 1 }, { unique: true });
 paymentSchema.index({ company: 1, paidAt: 1 });
 paymentSchema.index({ company: 1, member: 1 });
 paymentSchema.index({ company: 1, amountDue: 1 });
+paymentSchema.index({ company: 1, dueDate: 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

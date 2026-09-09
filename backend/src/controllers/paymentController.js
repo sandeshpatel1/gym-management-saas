@@ -35,29 +35,51 @@ const getPayments = asyncHandler(async (req, res) => {
 /**
  * Works out the GST split + dues for a payment being created. `invoiceAmount`
  * is what's actually billed (taxable + tax); if the caller doesn't send it,
- * it defaults to `amount` (fully paid, no dues, no tax).
+ * it defaults to `amount` (fully paid, no dues, no tax). `discountAmount`
+ * reduces the billed total before dues are computed.
  */
-const computeBilling = ({ amount, invoiceAmount, gstRate }) => {
+const computeBilling = ({ amount, invoiceAmount, gstRate, discountAmount }) => {
   const rate = Number(gstRate || 0);
-  const billed = invoiceAmount !== undefined ? Number(invoiceAmount) : Number(amount);
+  const discount = Number(discountAmount || 0);
+  let billed = invoiceAmount !== undefined ? Number(invoiceAmount) : Number(amount);
+  billed = Math.max(0, +(billed - discount).toFixed(2));
   const taxableAmount = rate > 0 ? +(billed / (1 + rate / 100)).toFixed(2) : billed;
   const taxTotal = +(billed - taxableAmount).toFixed(2);
   const cgstAmount = +(taxTotal / 2).toFixed(2);
   const sgstAmount = +(taxTotal - cgstAmount).toFixed(2);
   const amountDue = Math.max(0, +(billed - Number(amount)).toFixed(2));
   const status = amountDue <= 0 ? 'paid' : Number(amount) > 0 ? 'partial' : 'pending';
-  return { taxableAmount, gstRate: rate, cgstAmount, sgstAmount, invoiceAmount: billed, amountDue, status };
+  return {
+    taxableAmount,
+    gstRate: rate,
+    cgstAmount,
+    sgstAmount,
+    invoiceAmount: billed,
+    discountAmount: discount,
+    amountDue,
+    status,
+  };
 };
 
 // @route POST /api/payments  (standalone payment, not tied to registration/renewal flow)
 const createPayment = asyncHandler(async (req, res) => {
-  const { memberId, planId, amount, method, note, invoiceAmount, gstRate, dueDate } = req.body;
+  const {
+    memberId,
+    planId,
+    amount,
+    method,
+    note,
+    invoiceAmount,
+    gstRate,
+    discountAmount,
+    dueDate,
+  } = req.body;
   if (!memberId || amount === undefined) {
     res.status(400);
     throw new Error('memberId and amount are required');
   }
   const invoiceCount = await Payment.countDocuments({ company: req.user.company });
-  const billing = computeBilling({ amount, invoiceAmount, gstRate });
+  const billing = computeBilling({ amount, invoiceAmount, gstRate, discountAmount });
 
   const payment = await Payment.create({
     company: req.user.company,
@@ -75,11 +97,108 @@ const createPayment = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc  Download a single payment as a professional GST invoice PDF
- *        (company logo + watermark + GST breakdown + terms).
- * @route GET /api/payments/:id/invoice
- * @access Private
+ * @desc  Record an additional payment against an invoice that still has
+ *        an outstanding due (partial-payment collection). Never exceeds
+ *        the remaining amountDue.
+ * @route POST /api/payments/:id/collect
+ * @access Private (owner, manager)
  */
+const collectDue = asyncHandler(async (req, res) => {
+  const { amount, method } = req.body;
+  const amt = Number(amount);
+  if (!amt || amt <= 0) {
+    res.status(400);
+    throw new Error('Enter a valid amount');
+  }
+
+  const payment = await Payment.findOne({ _id: req.params.id, company: req.user.company });
+  if (!payment) {
+    res.status(404);
+    throw new Error('Invoice not found');
+  }
+  if (payment.amountDue <= 0) {
+    res.status(400);
+    throw new Error('This invoice has no outstanding due');
+  }
+  if (amt > payment.amountDue + 0.01) {
+    res.status(400);
+    throw new Error(`Amount exceeds outstanding due of Rs. ${payment.amountDue.toFixed(2)}`);
+  }
+
+  payment.amount = +(payment.amount + amt).toFixed(2);
+  payment.amountDue = Math.max(0, +(payment.amountDue - amt).toFixed(2));
+  payment.status = payment.amountDue <= 0 ? 'paid' : 'partial';
+  if (method) payment.method = method;
+  await payment.save();
+
+  const populated = await payment.populate([
+    { path: 'member', select: 'fullName memberCode phone' },
+    { path: 'plan', select: 'name' },
+  ]);
+
+  res.json({ success: true, data: populated });
+});
+
+/**
+ * @desc  Refund a payment (full or partial). Sets status to 'refunded' and
+ *        records who/why/when — separate from amountDue, which tracks
+ *        money still owed TO the gym, not money owed BACK to the member.
+ * @route POST /api/payments/:id/refund
+ * @access Private (owner)
+ */
+const refundPayment = asyncHandler(async (req, res) => {
+  const { amount, reason } = req.body;
+  const payment = await Payment.findOne({ _id: req.params.id, company: req.user.company });
+  if (!payment) {
+    res.status(404);
+    throw new Error('Invoice not found');
+  }
+
+  const amt = amount !== undefined ? Number(amount) : payment.amount;
+  if (!amt || amt <= 0 || amt > payment.amount + 0.01) {
+    res.status(400);
+    throw new Error('Enter a valid refund amount (up to the amount received)');
+  }
+
+  payment.status = 'refunded';
+  payment.refund = {
+    amount: amt,
+    reason: reason || '',
+    refundedAt: new Date(),
+    refundedBy: req.user._id,
+  };
+  await payment.save();
+
+  const populated = await payment.populate([
+    { path: 'member', select: 'fullName memberCode phone' },
+    { path: 'plan', select: 'name' },
+  ]);
+
+  res.json({ success: true, data: populated });
+});
+
+/**
+ * @desc  Marks that a reminder was sent for this due (bumps a counter/
+ *        timestamp so staff can see it was already followed up on).
+ *        The actual message is composed client-side (WhatsApp/SMS link) —
+ *        this just logs that it happened.
+ * @route POST /api/payments/:id/remind
+ * @access Private (owner, manager)
+ */
+const logReminder = asyncHandler(async (req, res) => {
+  const payment = await Payment.findOneAndUpdate(
+    { _id: req.params.id, company: req.user.company },
+    { $inc: { reminderCount: 1 }, $set: { lastReminderAt: new Date() } },
+    { new: true }
+  );
+  if (!payment) {
+    res.status(404);
+    throw new Error('Invoice not found');
+  }
+  res.json({ success: true, data: payment });
+});
+
+// @route GET /api/payments/:id/invoice
 const getPaymentInvoicePdf = asyncHandler(async (req, res) => {
   const payment = await Payment.findOne({ _id: req.params.id, company: req.user.company })
     .populate('member', 'fullName memberCode phone email')
@@ -91,7 +210,7 @@ const getPaymentInvoicePdf = asyncHandler(async (req, res) => {
   const company = await Company.findById(req.user.company);
 
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${payment.invoiceNumber}.pdf"`);
+  res.setHeader('Content-Disposition', `inline; filename="${payment.invoiceNumber}.pdf"`);
 
   const doc = new PDFDocument({ margin: 40, size: 'A4' });
   doc.pipe(res);
@@ -100,8 +219,8 @@ const getPaymentInvoicePdf = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc  Outstanding dues across all members - the Billing page's
- *        "Pending Payments" table.
+ * @desc  Outstanding dues across all members, sorted by most overdue first —
+ *        the Billing page's "Pending Payments" table.
  * @route GET /api/payments/dues
  * @access Private
  */
@@ -115,4 +234,12 @@ const getDuesReport = asyncHandler(async (req, res) => {
   res.json({ success: true, count: payments.length, totalDue, data: payments });
 });
 
-module.exports = { getPayments, createPayment, getPaymentInvoicePdf, getDuesReport };
+module.exports = {
+  getPayments,
+  createPayment,
+  collectDue,
+  refundPayment,
+  logReminder,
+  getPaymentInvoicePdf,
+  getDuesReport,
+};
