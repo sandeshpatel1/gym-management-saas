@@ -24,6 +24,7 @@ import {
   getGatewaySettingsApi,
   updateGatewaySettingsApi,
 } from '../../api/paymentGateway';
+import ImagePicker from '../../components/common/ImagePicker';
 
 
 const TABS = [
@@ -63,7 +64,7 @@ export default function Settings() {
   const [gatewaySavedInfo, setGatewaySavedInfo] = useState(null);
   const [gatewayLive, setGatewayLive] = useState(false);
   const [savingGateway, setSavingGateway] = useState(false);
-  const { register, handleSubmit, watch, reset, formState: { isDirty } } = useForm();
+  const { register, handleSubmit, watch, reset, setValue, formState: { isDirty } } = useForm();
 
   const watchedColor = watch('primaryColor');
   const watchedLogo = watch('logoUrl');
@@ -243,7 +244,14 @@ export default function Settings() {
                     >
                       <div className="space-y-4">
                         <Input label="Gym Name" {...register('name', { required: true })} />
-                        <Input label="Logo URL" placeholder="https://…" {...register('logoUrl')} />
+                        <ImagePicker
+                          label="Logo"
+                          value={watchedLogo}
+                          onChange={(val) => setValue('logoUrl', val, { shouldDirty: true })}
+                          shape="square"
+                          size={88}
+                          helperText="Square images look cleanest. Shown across the dashboard, invoices, and check-in kiosk."
+                        />
                         <Input label="Tagline" placeholder="Stronger every day" {...register('tagline')} />
                         <label className="block">
                           <span className="block text-[13px] font-medium text-ink-secondary dark:text-zinc-400 mb-1.5">

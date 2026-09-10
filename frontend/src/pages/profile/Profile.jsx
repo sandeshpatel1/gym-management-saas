@@ -38,6 +38,7 @@ export default function Profile() {
   const passwordForm = useForm();
 
   const avatarPreview = profileForm.watch('avatarUrl');
+  const { setValue: setProfileValue } = profileForm;
 
   const onSaveProfile = async (values) => {
     setSavingProfile(true);
@@ -169,15 +170,13 @@ export default function Profile() {
                   pattern: { value: PHONE_PATTERN, message: 'Enter a valid phone number' },
                 })}
               />
-              <Input
-                label="Avatar URL (optional)"
-                placeholder="https://…"
-                error={profileForm.formState.errors.avatarUrl?.message}
-                {...profileForm.register('avatarUrl', {
-                  validate: (v) =>
-                    !v || URL_PATTERN.test(v) || 'Enter a valid image URL (must start with http:// or https://)',
-                })}
-              />
+              <ImagePicker
+                  label="Avatar"
+                  value={avatarPreview}
+                  onChange={(val) => profileForm.setValue('avatarUrl', val, { shouldDirty: true, shouldValidate: true })}
+                  shape="circle"
+                  size={80}
+                />
               <Input label="Email" value={user?.email || ''} disabled />
               <Button type="submit" loading={savingProfile}>
                 Save Changes

@@ -37,6 +37,11 @@ const manage = (company) => {
   navigate('/dashboard');
 };
 
+
+
+
+
+
   const load = async () => {
     setLoading(true);
     try {
@@ -130,6 +135,8 @@ const manage = (company) => {
       toast.error(err.response?.data?.message || 'Could not update company');
     }
   };
+
+
 
   return (
     <DashboardLayout title="Company Master">
@@ -253,7 +260,13 @@ const manage = (company) => {
             <option value="pro">Pro</option>
             <option value="enterprise">Enterprise</option>
           </Select>
-          <Input label="Logo URL" {...editForm.register('logoUrl')} />
+          <ImagePicker
+                label="Logo"
+                value={editForm.watch('logoUrl')}
+                onChange={(val) => editForm.setValue('logoUrl', val, { shouldDirty: true })}
+                shape="square"
+                size={80}
+              />
           <Input label="Tagline" {...editForm.register('tagline')} />
           <label className="block">
             <span className="block text-[13px] font-medium text-ink-secondary mb-1.5">Brand Color</span>
