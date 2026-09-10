@@ -46,7 +46,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="glass w-64 shrink-0 h-screen sticky top-0 flex flex-col border-r border-black/[0.06] dark:border-white/[0.08]">
+    <aside className="glass w-64 shrink-0 h-full flex flex-col border-r border-black/[0.06] dark:border-white/[0.08]">
       <div className="flex items-center gap-3 px-5 py-5">
         <CompanyLogo company={showTenantNav ? effectiveCompany : null} />
         <div className="min-w-0">

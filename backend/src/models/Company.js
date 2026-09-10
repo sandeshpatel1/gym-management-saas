@@ -65,10 +65,15 @@ const companySchema = new mongoose.Schema(
     },
     paymentSettings: {
       upi: {
-        vpa: { type: String, trim: true, default: '' },        // e.g. "ironparadise@okhdfcbank"
+        vpa: { type: String, trim: true, default: '' },
         payeeName: { type: String, trim: true, default: '' },
       },
-      enabledMethods: [{ type: String }], // subset of the platform's method keys this gym accepts
+      enabledMethods: [{ type: String }],
+      gateway: {
+        provider: { type: String, trim: true, lowercase: true, default: '' }, // must match a PlatformSettings.gatewayProviders key
+        credentials: { type: mongoose.Schema.Types.Mixed, default: {} },      // { fieldName: <encrypted string> }
+        isLive: { type: Boolean, default: false },
+      },
     },
   },
   { timestamps: true }

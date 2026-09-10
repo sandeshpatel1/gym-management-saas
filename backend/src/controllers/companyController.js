@@ -2,6 +2,94 @@ const asyncHandler = require('express-async-handler');
 const Company = require('../models/Company');
 const User = require('../models/User');
 const QRCode = require('qrcode');
+const PlatformSettings = require('../models/PlatformSettings'); // add near top with other requires
+const { encrypt, decrypt, mask } = require('../utils/crypto');   // add near top
+
+
+
+/**
+ * @desc  Returns which gateway this gym has configured, with credentials
+ *        MASKED (never sends decrypted secrets to the browser).
+ * @route GET /api/companies/:id/gateway-settings
+ * @access Private (that gym's owner, or superadmin)
+ */
+const getGatewaySettings = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'superadmin' && String(req.user.company) !== req.params.id) {
+    res.status(403);
+    throw new Error("You can only view your own gym's gateway settings");
+  }
+  const company = await Company.findById(req.params.id);
+  if (!company) {
+    res.status(404);
+    throw new Error('Company not found');
+  }
+  const rawCredentials = company.paymentSettings?.gateway?.credentials || {};
+  const maskedCredentials = {};
+  Object.entries(rawCredentials).forEach(([k, v]) => {
+    maskedCredentials[k] = mask(decrypt(v));
+  });
+  res.json({
+    success: true,
+    data: {
+      provider: company.paymentSettings?.gateway?.provider || '',
+      isLive: !!company.paymentSettings?.gateway?.isLive,
+      credentials: maskedCredentials,
+      configured: Object.keys(rawCredentials).length > 0,
+    },
+  });
+});
+
+/**
+ * @desc  Save/update this gym's gateway provider + credentials. Fields left
+ *        blank keep their previously stored (encrypted) value, so an owner
+ *        editing one field doesn't wipe another they aren't re-typing.
+ * @route PUT /api/companies/:id/gateway-settings
+ * @access Private (that gym's owner, or superadmin)
+ */
+const updateGatewaySettings = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'superadmin' && String(req.user.company) !== req.params.id) {
+    res.status(403);
+    throw new Error("You can only update your own gym's gateway settings");
+  }
+  const { provider, credentials, isLive } = req.body;
+  if (!provider) {
+    res.status(400);
+    throw new Error('provider is required');
+  }
+
+  const settings = await PlatformSettings.getSingleton();
+  const providerDef = settings.gatewayProviders.find((g) => g.key === provider && g.enabled);
+  if (!providerDef) {
+    res.status(400);
+    throw new Error('That payment gateway is not available on this platform. Ask your platform admin to enable it.');
+  }
+
+  const company = await Company.findById(req.params.id);
+  if (!company) {
+    res.status(404);
+    throw new Error('Company not found');
+  }
+
+  const encryptedCredentials = {};
+  providerDef.fields.forEach((f) => {
+    const incoming = credentials?.[f.name];
+    if (incoming === undefined || incoming === '') {
+      const existing = company.paymentSettings?.gateway?.credentials?.[f.name];
+      if (existing) encryptedCredentials[f.name] = existing;
+      return;
+    }
+    encryptedCredentials[f.name] = encrypt(incoming);
+  });
+
+  company.paymentSettings = company.paymentSettings || {};
+  company.paymentSettings.gateway = { provider, credentials: encryptedCredentials, isLive: !!isLive };
+  await company.save();
+
+  res.json({ success: true, message: 'Gateway settings saved' });
+});
+
+
+
 
 /**
  * @desc  List all companies (platform-wide Company Master table)
@@ -170,4 +258,6 @@ module.exports = {
   updateCompany,
   setCompanyStatus,
   getUpiQrPreview,
+  getGatewaySettings,
+  updateGatewaySettings,
 };

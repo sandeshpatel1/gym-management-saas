@@ -62,7 +62,7 @@ export default function MemberForm() {
     watch,
     trigger,
     formState: { errors },
-  } = useForm({ defaultValues: { gender: 'male' } });
+  } = useForm({ defaultValues: { gender: 'male', planId: '' } });
 
   const selectedPlanId = watch('planId');
   const selectedPlan = plans.find((p) => p._id === selectedPlanId);
@@ -85,7 +85,7 @@ export default function MemberForm() {
 
   useEffect(() => {
     let objectUrl;
-    if (paymentMethod === 'upi' && effectiveCompany?.id && amountDue >= 0 && selectedPlan) {
+    if (paymentMethod === 'upi' && effectiveCompany?.id && selectedPlan) {
       setUpiLoading(true);
       getUpiQrPreviewApi(effectiveCompany.id, amountReceived || 0, `Registration - ${selectedPlan.name}`)
         .then((blob) => {
@@ -103,13 +103,21 @@ export default function MemberForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentMethod, amountReceived, effectiveCompany?.id, selectedPlanId]);
 
-  const goNext = async () => {
+  // --- Step navigation is fully manual and defensive: preventDefault +
+  // stopPropagation on every click, so nothing here can ever fall through
+  // to a native form submission no matter what the browser/Enter-key/
+  // button-type edge case is. Advancing steps NEVER calls onSubmit. ---
+  const goNext = async (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+
     if (step === 1) {
       const valid = await trigger(['fullName', 'phone', 'email', 'gender', 'dob']);
       if (!valid) return;
     }
+
     if (step === 2 && selectedPlanId) {
-      if (!amountReceived || Number(amountReceived) < 0) {
+      if (amountReceived === '' || Number(amountReceived) < 0) {
         toast.error('Enter the amount received (0 is fine for "no payment yet")');
         return;
       }
@@ -118,11 +126,15 @@ export default function MemberForm() {
         return;
       }
     }
-    // No plan selected -> skip straight to submit-ready step 3, which will just register the profile
+
     setStep((s) => Math.min(3, s + 1));
   };
 
-  const goBack = () => setStep((s) => Math.max(1, s - 1));
+  const goBack = (e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    setStep((s) => Math.max(1, s - 1));
+  };
 
   const onSubmit = async (values) => {
     if (selectedPlanId && amountDue > 0 && !dueDate) {
@@ -163,12 +175,24 @@ export default function MemberForm() {
     }
   };
 
+  // Step 3's "Register Member" button is type="button" and manually
+  // triggers RHF's validated submit handler on click. This means the ONLY
+  // way onSubmit ever runs is this explicit call — never via implicit
+  // browser form submission, Enter-key, or a stray submit-typed control.
+  const handleRegisterClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    await handleSubmit(onSubmit)();
+  };
+
   return (
     <DashboardLayout title="Register Member">
       <div className="max-w-3xl mx-auto">
         <StepIndicator step={step} />
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        {/* noValidate: stops native HTML5 validation / implicit-submit-on-Enter
+            quirks from ever interacting with this form at all. */}
+        <form noValidate onSubmit={(e) => e.preventDefault()}>
           {step === 1 && (
             <div className="space-y-6">
               <Card className="p-6">
@@ -330,7 +354,7 @@ export default function MemberForm() {
                 Continue
               </Button>
             ) : (
-              <Button type="submit" loading={submitting}>
+              <Button type="button" onClick={handleRegisterClick} loading={submitting}>
                 Register Member
               </Button>
             )}
