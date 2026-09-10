@@ -13,6 +13,7 @@ import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import EmptyState from '../../components/ui/EmptyState';
+import ImagePicker from '../../components/common/ImagePicker';
 import {
   getCompaniesApi,
   createCompanyApi,

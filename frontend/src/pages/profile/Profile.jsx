@@ -10,6 +10,7 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 import { useAuth } from '../../context/AuthContext';
 import { updateMeApi } from '../../api/auth';
+import ImagePicker from '../../components/common/ImagePicker';
 
 const PHONE_PATTERN = /^[+]?[0-9]{10,15}$/;
 const URL_PATTERN = /^https?:\/\/.+/i;
