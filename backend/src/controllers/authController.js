@@ -171,11 +171,21 @@ const updateMe = asyncHandler(async (req, res) => {
   }
 
   if (avatarUrl !== undefined) {
-    if (avatarUrl.trim() && !URL_REGEX.test(avatarUrl.trim())) {
+    const trimmed = avatarUrl.trim();
+    const isHttpUrl = URL_REGEX.test(trimmed);
+    const isDataImage = /^data:image\/(png|jpe?g|gif|webp);base64,/i.test(trimmed);
+
+    if (trimmed && !isHttpUrl && !isDataImage) {
       res.status(400);
-      throw new Error('Avatar URL must be a valid http(s) link');
+      throw new Error('Avatar must be a valid http(s) link or an uploaded image');
     }
-    user.avatarUrl = avatarUrl.trim();
+    // Base64 data URLs can get large — cap around ~2MB of encoded data so a
+    // single avatar can't bloat the User document unreasonably.
+    if (isDataImage && trimmed.length > 2_000_000) {
+      res.status(400);
+      throw new Error('Uploaded image is too large — please choose a smaller photo');
+    }
+    user.avatarUrl = trimmed;
   }
 
   if (newPassword) {
