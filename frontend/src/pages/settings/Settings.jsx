@@ -435,39 +435,93 @@ export default function Settings() {
             </div>
           </Card>
 
-          {/* --- Live preview --- */}
-          <div className="lg:sticky lg:top-6 space-y-4">
-            <Card className="overflow-hidden">
-              <div
-                className="h-20 relative"
-                style={{ background: `linear-gradient(135deg, ${watchedColor || '#0A84FF'}, ${watchedColor || '#0A84FF'}99)` }}
-              />
-              <div className="px-5 pb-5 -mt-8">
-                <div className="flex items-end gap-3 mb-3">
-                  <div className="ring-4 ring-white dark:ring-zinc-900 rounded-xl">
-                    <CompanyLogo company={{ name: watchedName, branding: { logoUrl: watchedLogo } }} size={56} />
-                  </div>
-                </div>
-                <p className="text-[15px] font-semibold text-ink dark:text-zinc-100 truncate">
-                  {watchedName || 'Your Gym'}
-                </p>
-                <p className="text-[12.5px] text-ink-tertiary dark:text-zinc-500 truncate">
-                  {watchedTagline || 'This is how your identity appears across the dashboard & invoices'}
-                </p>
-              </div>
-            </Card>
 
-            <Card className="p-5">
-              <p className="text-[12.5px] font-medium text-ink dark:text-zinc-200 flex items-center gap-1.5 mb-2">
-                <ImageIcon size={14} className="text-ink-tertiary dark:text-zinc-500" /> Tips
-              </p>
-              <ul className="space-y-2 text-[12.5px] text-ink-tertiary dark:text-zinc-500 leading-relaxed">
-                <li>• Use a square, transparent-background logo for the cleanest fit.</li>
-                <li>• Your brand color drives every button and accent — pick something with good contrast against white.</li>
-                <li>• GST fields only matter if you invoice with tax; leave the rate at 0 otherwise.</li>
-              </ul>
-            </Card>
+         {/* --- Live preview --- */}
+<div className="lg:sticky lg:top-6 space-y-4">
+  <Card className="overflow-hidden">
+    <div className="px-4 py-3 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
+      <p className="text-[12.5px] font-semibold text-ink dark:text-zinc-100">Live Preview</p>
+      <span className="text-[11px] text-ink-tertiary dark:text-zinc-500">Updates as you type</span>
+    </div>
+
+    {/* Mini browser-chrome mockup so the brand color/logo are shown in context, not just as a flat banner */}
+    <div className="p-4">
+      <div className="rounded-2xl overflow-hidden border border-black/[0.06] dark:border-white/[0.08] shadow-card">
+        {/* fake window chrome */}
+        <div className="flex items-center gap-1.5 px-3 py-2 bg-surface-subtle dark:bg-zinc-950 border-b border-black/[0.06] dark:border-white/[0.08]">
+          <span className="h-2.5 w-2.5 rounded-full bg-red-400/70" />
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-400/70" />
+          <span className="h-2.5 w-2.5 rounded-full bg-green-400/70" />
+        </div>
+
+        {/* mock app header, using the real logo + name + brand color */}
+        <div className="bg-white dark:bg-zinc-900 px-4 py-3.5 flex items-center gap-3 border-b border-black/[0.06] dark:border-white/[0.08]">
+          <CompanyLogo company={{ name: watchedName, branding: { logoUrl: watchedLogo } }} size={38} />
+          <div className="min-w-0 flex-1">
+            <p className="text-[13.5px] font-semibold text-ink dark:text-zinc-100 truncate">
+              {watchedName || 'Your Gym'}
+            </p>
+            <p className="text-[11px] text-ink-tertiary dark:text-zinc-500 truncate">
+              {watchedTagline || 'Your tagline appears here'}
+            </p>
           </div>
+          <span
+            className="h-7 px-3 rounded-full text-[11px] font-medium text-white flex items-center shrink-0"
+            style={{ background: watchedColor || '#0A84FF' }}
+          >
+            Save
+          </span>
+        </div>
+
+        {/* mock dashboard body strip so the brand color reads as an accent, not just a banner */}
+        <div className="bg-surface-subtle dark:bg-zinc-950 px-4 py-4 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <span
+              className="h-8 w-8 rounded-lg shrink-0"
+              style={{ background: `${watchedColor || '#0A84FF'}1A` }}
+            />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-2 w-3/4 rounded-full bg-black/[0.08] dark:bg-white/[0.1]" />
+              <div className="h-2 w-1/2 rounded-full bg-black/[0.06] dark:bg-white/[0.07]" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="h-8 w-8 rounded-lg shrink-0"
+              style={{ background: `${watchedColor || '#0A84FF'}1A` }}
+            />
+            <div className="flex-1 space-y-1.5">
+              <div className="h-2 w-2/3 rounded-full bg-black/[0.08] dark:bg-white/[0.1]" />
+              <div className="h-2 w-1/3 rounded-full bg-black/[0.06] dark:bg-white/[0.07]" />
+            </div>
+          </div>
+          <div
+            className="h-1.5 w-full rounded-full mt-1"
+            style={{ background: `linear-gradient(90deg, ${watchedColor || '#0A84FF'}, ${watchedColor || '#0A84FF'}55)` }}
+          />
+        </div>
+      </div>
+    </div>
+  </Card>
+
+  <Card className="p-5">
+    <p className="text-[12.5px] font-semibold text-ink dark:text-zinc-100 mb-3.5">Tips</p>
+    <ul className="space-y-3">
+      {[
+        { icon: ImageIcon, text: 'Use a square, transparent-background logo for the cleanest fit.' },
+        { icon: Palette, text: 'Your brand color drives every button and accent — pick something with good contrast against white.' },
+        { icon: FileText, text: 'GST fields only matter if you invoice with tax; leave the rate at 0 otherwise.' },
+      ].map(({ icon: Icon, text }, i) => (
+        <li key={i} className="flex items-start gap-2.5">
+          <span className="h-6 w-6 rounded-lg bg-brand/10 text-brand flex items-center justify-center shrink-0 mt-0.5">
+            <Icon size={12} />
+          </span>
+          <span className="text-[12.5px] text-ink-secondary dark:text-zinc-400 leading-relaxed">{text}</span>
+        </li>
+      ))}
+    </ul>
+  </Card>
+</div>
         </div>
       </form>
     </DashboardLayout>
