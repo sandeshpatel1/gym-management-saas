@@ -4,12 +4,18 @@ const bcrypt = require('bcryptjs');
 /**
  * User = anyone who LOGS IN to the dashboard (staff), not a gym member.
  * - role 'superadmin': platform owner, not tied to a single company, manages Company Master.
- * - role 'owner': gym owner/admin for their company.
+ * - role 'owner': gym owner/admin for their company (their "home" branch).
  * - role 'manager': front-desk / manager, scoped operational access.
  * - role 'trainer': trainer, limited to attendance + assigned members.
  *
  * `company` is null only for superadmin. Every other role MUST have a company,
  * enforced in the pre-validate hook below.
+ *
+ * `branchAccess` = ADDITIONAL companies (branches) an OWNER can switch into
+ * from the same login, on top of their home `company`. Managers/trainers
+ * don't use this field - they stay scoped to their one company. See
+ * middleware/auth.js `requireCompanyScope` for how the active branch is
+ * resolved per-request, and BranchSwitcher.jsx for the UI.
  */
 const userSchema = new mongoose.Schema(
   {
@@ -18,6 +24,7 @@ const userSchema = new mongoose.Schema(
       ref: 'Company',
       default: null,
     },
+    branchAccess: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Company' }],
     name: { type: String, required: true, trim: true, maxlength: 80 },
     email: {
       type: String,

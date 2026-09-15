@@ -8,7 +8,6 @@ import {
   FileBarChart,
   Building2,
   UsersRound,
-  Monitor,
   Receipt,
   PhoneCall,
   Settings as SettingsIcon,
@@ -16,6 +15,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import CompanyLogo from '../common/CompanyLogo';
+import BranchSwitcher from '../common/BranchSwitcher';
 import { useAuth } from '../../context/AuthContext';
 
 const linkClass = ({ isActive }) =>
@@ -59,6 +59,9 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* Owner-only: switch between (or add) branches of the same business */}
+      <BranchSwitcher />
+
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
         {showTenantNav && (
           <>
@@ -71,16 +74,12 @@ export default function Sidebar() {
             <NavLink to="/members/new" className={linkClass}>
               <UserPlus size={18} /> Register Member
             </NavLink>
-            
             <NavLink to="/follow-ups" className={linkClass}>
               <PhoneCall size={18} /> Follow-ups
             </NavLink>
             <NavLink to="/attendance" className={linkClass}>
               <CalendarCheck size={18} /> Attendance
             </NavLink>
-            {/* <NavLink to="/attendance/kiosk" className={linkClass}>
-              <Monitor size={18} /> Attendance Kiosk
-            </NavLink> */}
             <NavLink to="/membership-plans" className={linkClass}>
               <CreditCard size={18} /> Membership Plans
             </NavLink>
@@ -103,22 +102,22 @@ export default function Sidebar() {
           </>
         )}
 
-{isSuperadmin && !isManaging && (
-  <>
-    <NavLink to="/superadmin/dashboard" className={linkClass}>
-      <LayoutDashboard size={18} /> Dashboard
-    </NavLink>
-    <NavLink to="/company-master" className={linkClass}>
-      <Building2 size={18} /> Company Master
-    </NavLink>
-    <NavLink to="/superadmin/users" className={linkClass}>
-      <UsersRound size={18} /> All Users
-    </NavLink>
-    <NavLink to="/superadmin/payment-methods" className={linkClass}>
-      <Wallet size={18} /> Payment Methods
-    </NavLink>
-  </>
-)}
+        {isSuperadmin && !isManaging && (
+          <>
+            <NavLink to="/superadmin/dashboard" className={linkClass}>
+              <LayoutDashboard size={18} /> Dashboard
+            </NavLink>
+            <NavLink to="/company-master" className={linkClass}>
+              <Building2 size={18} /> Company Master
+            </NavLink>
+            <NavLink to="/superadmin/users" className={linkClass}>
+              <UsersRound size={18} /> All Users
+            </NavLink>
+            <NavLink to="/superadmin/payment-methods" className={linkClass}>
+              <Wallet size={18} /> Payment Methods
+            </NavLink>
+          </>
+        )}
       </nav>
 
       <div className="px-6 pb-3">

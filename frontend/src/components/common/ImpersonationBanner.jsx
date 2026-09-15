@@ -3,10 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ImpersonationBanner() {
-  const { managingCompany, stopManaging } = useAuth();
+  const { user, managingCompany, stopManaging } = useAuth();
   const navigate = useNavigate();
 
-  if (!managingCompany) return null;
+  // Only superadmin's "Manage this gym" impersonation shows this banner.
+  // An owner switching between their own branches (BranchSwitcher) also
+  // uses managingCompany under the hood, but that's normal day-to-day use
+  // for them, not a platform-admin-acting-as-someone-else situation.
+  if (user?.role !== 'superadmin' || !managingCompany) return null;
 
   const exit = () => {
     stopManaging();

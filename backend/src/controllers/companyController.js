@@ -2,10 +2,8 @@ const asyncHandler = require('express-async-handler');
 const Company = require('../models/Company');
 const User = require('../models/User');
 const QRCode = require('qrcode');
-const PlatformSettings = require('../models/PlatformSettings'); // add near top with other requires
-const { encrypt, decrypt, mask } = require('../utils/crypto');   // add near top
-
-
+const PlatformSettings = require('../models/PlatformSettings');
+const { encrypt, decrypt, mask } = require('../utils/crypto');
 
 /**
  * @desc  Returns which gateway this gym has configured, with credentials
@@ -88,8 +86,73 @@ const updateGatewaySettings = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Gateway settings saved' });
 });
 
+/**
+ * @desc  Every gym (Company) the current login can access - their home
+ *        company plus any additional branches linked via `branchAccess`.
+ *        For managers/trainers this is always just their one company; for
+ *        owners with multiple locations this powers the branch switcher.
+ * @route GET /api/companies/my-branches
+ * @access Private (any non-superadmin login)
+ */
+const getMyBranches = asyncHandler(async (req, res) => {
+  const ids = [req.user.company, ...(req.user.branchAccess || [])]
+    .filter(Boolean)
+    .map((id) => String(id));
+  const uniqueIds = [...new Set(ids)];
 
+  const branches = await Company.find({ _id: { $in: uniqueIds } })
+    .select('name code branding contact.city contact.state isActive')
+    .sort({ name: 1 });
 
+  res.json({ success: true, count: branches.length, data: branches });
+});
+
+/**
+ * @desc  Self-serve: an OWNER creates an additional branch/location of
+ *        their own gym business. Each branch is a fully independent
+ *        Company (own name, code, branding, address, plans, members,
+ *        staff) - it's simply linked into this owner's `branchAccess` list
+ *        so the SAME login can switch between branches from the sidebar,
+ *        instead of needing a separate account per location.
+ * @route POST /api/companies/branches
+ * @access Private (owner)
+ */
+const createBranch = asyncHandler(async (req, res) => {
+  const { name, code, contact } = req.body;
+
+  if (!name || !code) {
+    res.status(400);
+    throw new Error('Branch name and code are required');
+  }
+
+  const existing = await Company.findOne({ code: code.toUpperCase() });
+  if (existing) {
+    res.status(409);
+    throw new Error('This company code is already taken, please choose another');
+  }
+
+  const branch = await Company.create({ name, code: code.toUpperCase(), contact });
+
+  await User.findByIdAndUpdate(req.user._id, { $addToSet: { branchAccess: branch._id } });
+
+  res.status(201).json({ success: true, data: branch });
+});
+
+/**
+ * @desc  Owner unlinks a branch from their own switcher. This does NOT
+ *        delete the gym or any of its data - it only removes it from this
+ *        login's accessible branch list.
+ * @route DELETE /api/companies/branches/:id
+ * @access Private (owner)
+ */
+const removeBranch = asyncHandler(async (req, res) => {
+  if (String(req.user.company) === req.params.id) {
+    res.status(400);
+    throw new Error('You cannot remove your home branch - contact your platform admin to change it');
+  }
+  await User.findByIdAndUpdate(req.user._id, { $pull: { branchAccess: req.params.id } });
+  res.json({ success: true, message: 'Branch removed from your account' });
+});
 
 /**
  * @desc  List all companies (platform-wide Company Master table)
@@ -260,4 +323,7 @@ module.exports = {
   getUpiQrPreview,
   getGatewaySettings,
   updateGatewaySettings,
+  getMyBranches,
+  createBranch,
+  removeBranch,
 };

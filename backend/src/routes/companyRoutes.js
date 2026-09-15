@@ -9,11 +9,20 @@ const {
   getUpiQrPreview,
   getGatewaySettings,
   updateGatewaySettings,
+  getMyBranches,
+  createBranch,
+  removeBranch,
 } = require('../controllers/companyController');
 
 const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Branch access (owner multi-location) - registered before the `/:id`
+// routes below so these literal paths are never mistaken for an id.
+router.get('/my-branches', protect, getMyBranches);
+router.post('/branches', protect, authorize('owner'), createBranch);
+router.delete('/branches/:id', protect, authorize('owner'), removeBranch);
 
 // Company Master list/create - platform superadmin only
 router.get('/', protect, authorize('superadmin'), getCompanies);

@@ -124,4 +124,63 @@ const deleteUser = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'User removed' });
 });
 
-module.exports = { getUsers, createUser, updateUser, deleteUser };
+/**
+ * @desc  Superadmin tool: link an existing (already-onboarded) Company to
+ *        an owner's account as an additional branch. Useful when two gyms
+ *        were onboarded separately but turn out to be the same owner's
+ *        locations and should be merged into one login's branch switcher.
+ * @route POST /api/users/:id/branches
+ * @access Private (superadmin)
+ */
+const linkBranch = asyncHandler(async (req, res) => {
+  const { companyId } = req.body;
+  if (!companyId) {
+    res.status(400);
+    throw new Error('companyId is required');
+  }
+  const target = await User.findById(req.params.id);
+  if (!target) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  if (target.role !== 'owner') {
+    res.status(400);
+    throw new Error('Only owner accounts can have linked branches');
+  }
+  const company = await Company.findById(companyId);
+  if (!company) {
+    res.status(404);
+    throw new Error('Company not found');
+  }
+  await User.findByIdAndUpdate(target._id, { $addToSet: { branchAccess: company._id } });
+  res.json({ success: true, message: `${company.name} linked to ${target.name}'s account` });
+});
+
+/**
+ * @desc  Superadmin tool: unlink a branch from an owner's account (does not
+ *        delete the gym or its data).
+ * @route DELETE /api/users/:id/branches/:companyId
+ * @access Private (superadmin)
+ */
+const unlinkBranch = asyncHandler(async (req, res) => {
+  const target = await User.findById(req.params.id);
+  if (!target) {
+    res.status(404);
+    throw new Error('User not found');
+  }
+  if (String(target.company) === req.params.companyId) {
+    res.status(400);
+    throw new Error("Cannot unlink an owner's home branch this way");
+  }
+  await User.findByIdAndUpdate(target._id, { $pull: { branchAccess: req.params.companyId } });
+  res.json({ success: true, message: 'Branch unlinked' });
+});
+
+module.exports = {
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
+  linkBranch,
+  unlinkBranch,
+};
