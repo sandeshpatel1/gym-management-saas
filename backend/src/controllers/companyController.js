@@ -90,7 +90,8 @@ const updateGatewaySettings = asyncHandler(async (req, res) => {
  * @desc  Every gym (Company) the current login can access - their home
  *        company plus any additional branches linked via `branchAccess`.
  *        For managers/trainers this is always just their one company; for
- *        owners with multiple locations this powers the branch switcher.
+ *        owners with multiple locations this powers the branch switcher
+ *        and the "All Branches" rollup page.
  * @route GET /api/companies/my-branches
  * @access Private (any non-superadmin login)
  */
@@ -108,21 +109,27 @@ const getMyBranches = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc  Self-serve: an OWNER creates an additional branch/location of
- *        their own gym business. Each branch is a fully independent
- *        Company (own name, code, branding, address, plans, members,
- *        staff) - it's simply linked into this owner's `branchAccess` list
- *        so the SAME login can switch between branches from the sidebar,
- *        instead of needing a separate account per location.
+ * @desc  Superadmin-only: onboard a brand-new branch (a fully independent
+ *        Company - own name, code, branding, address, GST settings, plans,
+ *        members, staff) and link it into an EXISTING owner's account.
+ *        Deliberately does NOT create a new login - the whole point is
+ *        that one owner login now reaches every branch superadmin has
+ *        granted them, via `branchAccess`.
  * @route POST /api/companies/branches
- * @access Private (owner)
+ * @access Private (superadmin)
  */
-const createBranch = asyncHandler(async (req, res) => {
-  const { name, code, contact } = req.body;
+const createBranchForOwner = asyncHandler(async (req, res) => {
+  const { ownerId, name, code, contact, branding, invoiceSettings } = req.body;
 
-  if (!name || !code) {
+  if (!ownerId || !name || !code) {
     res.status(400);
-    throw new Error('Branch name and code are required');
+    throw new Error('ownerId, name and code are required');
+  }
+
+  const owner = await User.findById(ownerId);
+  if (!owner || owner.role !== 'owner') {
+    res.status(404);
+    throw new Error('Owner not found');
   }
 
   const existing = await Company.findOne({ code: code.toUpperCase() });
@@ -131,17 +138,28 @@ const createBranch = asyncHandler(async (req, res) => {
     throw new Error('This company code is already taken, please choose another');
   }
 
-  const branch = await Company.create({ name, code: code.toUpperCase(), contact });
+  const branch = await Company.create({
+    name,
+    code: code.toUpperCase(),
+    contact,
+    branding,
+    invoiceSettings,
+  });
 
-  await User.findByIdAndUpdate(req.user._id, { $addToSet: { branchAccess: branch._id } });
+  await User.findByIdAndUpdate(owner._id, { $addToSet: { branchAccess: branch._id } });
 
-  res.status(201).json({ success: true, data: branch });
+  res.status(201).json({
+    success: true,
+    data: branch,
+    owner: { id: owner._id, name: owner.name, email: owner.email },
+  });
 });
 
 /**
- * @desc  Owner unlinks a branch from their own switcher. This does NOT
- *        delete the gym or any of its data - it only removes it from this
- *        login's accessible branch list.
+ * @desc  Owner unlinks a branch from their OWN switcher/visibility. This
+ *        does NOT delete the gym or any of its data, and does not require
+ *        superadmin - it's just "stop showing me this branch." Superadmin
+ *        can also fully revoke access via userController.unlinkBranch.
  * @route DELETE /api/companies/branches/:id
  * @access Private (owner)
  */
@@ -324,6 +342,6 @@ module.exports = {
   getGatewaySettings,
   updateGatewaySettings,
   getMyBranches,
-  createBranch,
+  createBranchForOwner,
   removeBranch,
 };

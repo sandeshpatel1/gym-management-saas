@@ -13,10 +13,12 @@ import {
   Settings as SettingsIcon,
   LogOut,
   Wallet,
+  Layers,
 } from 'lucide-react';
 import CompanyLogo from '../common/CompanyLogo';
 import BranchSwitcher from '../common/BranchSwitcher';
 import { useAuth } from '../../context/AuthContext';
+import { useMyBranches } from '../../hooks/useMyBranches';
 
 const linkClass = ({ isActive }) =>
   `flex items-center gap-3 px-3 py-2.5 rounded-xl text-[14px] font-medium transition-all duration-200 press-feedback ${
@@ -27,6 +29,7 @@ const linkClass = ({ isActive }) =>
 
 export default function Sidebar() {
   const { user, logout, managingCompany, stopManaging, effectiveCompany } = useAuth();
+  const { branches } = useMyBranches();
   const navigate = useNavigate();
   const isSuperadmin = user?.role === 'superadmin';
   const isManaging = isSuperadmin && !!managingCompany;
@@ -34,6 +37,7 @@ export default function Sidebar() {
   // superadmin who has picked a gym to manage.
   const showTenantNav = !isSuperadmin || isManaging;
   const isOwner = user?.role === 'owner' || isManaging;
+  const hasMultipleBranches = user?.role === 'owner' && branches.length > 1;
 
   const handleLogout = () => {
     logout();
@@ -59,7 +63,7 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Owner-only: switch between (or add) branches of the same business */}
+      {/* Owner-only, only rendered when there's actually more than one branch */}
       <BranchSwitcher />
 
       <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
@@ -68,6 +72,11 @@ export default function Sidebar() {
             <NavLink to="/dashboard" className={linkClass}>
               <LayoutDashboard size={18} /> Dashboard
             </NavLink>
+            {hasMultipleBranches && (
+              <NavLink to="/my-branches" className={linkClass}>
+                <Layers size={18} /> All Branches
+              </NavLink>
+            )}
             <NavLink to="/members" className={linkClass}>
               <Users size={18} /> Members
             </NavLink>
@@ -109,6 +118,9 @@ export default function Sidebar() {
             </NavLink>
             <NavLink to="/company-master" className={linkClass}>
               <Building2 size={18} /> Company Master
+            </NavLink>
+            <NavLink to="/company-master/add-branch" className={linkClass}>
+              <Layers size={18} /> Add Branch
             </NavLink>
             <NavLink to="/superadmin/users" className={linkClass}>
               <UsersRound size={18} /> All Users

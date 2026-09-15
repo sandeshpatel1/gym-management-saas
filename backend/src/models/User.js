@@ -12,10 +12,14 @@ const bcrypt = require('bcryptjs');
  * enforced in the pre-validate hook below.
  *
  * `branchAccess` = ADDITIONAL companies (branches) an OWNER can switch into
- * from the same login, on top of their home `company`. Managers/trainers
- * don't use this field - they stay scoped to their one company. See
- * middleware/auth.js `requireCompanyScope` for how the active branch is
- * resolved per-request, and BranchSwitcher.jsx for the UI.
+ * from the same login, on top of their home `company`. Branches are created
+ * by superadmin only (see companyController.createBranchForOwner) - an
+ * owner cannot self-serve create one.
+ *
+ * `canCreateBranches` is a forward-looking flag (default false, no UI yet):
+ * the plan is to let superadmin later mark a trusted, paying owner as
+ * eligible for self-serve branch creation. It does nothing today - it's
+ * just here so that feature doesn't need another migration when it lands.
  */
 const userSchema = new mongoose.Schema(
   {
@@ -25,6 +29,7 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
     branchAccess: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Company' }],
+    canCreateBranches: { type: Boolean, default: false },
     name: { type: String, required: true, trim: true, maxlength: 80 },
     email: {
       type: String,

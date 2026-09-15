@@ -23,6 +23,8 @@ import Profile from './pages/profile/Profile';
 import MemberEdit from './pages/members/MemberEdit';
 import PhotoCapture from './pages/members/PhotoCapture';
 import PlatformPaymentSettings from './pages/superadmin/PlatformPaymentSettings'; // add with other imports
+import AddBranch from './pages/company/AddBranch';
+import MyBranchesOverview from './pages/dashboard/MyBranchesOverview';
 
 
 function RootRedirect() {
@@ -166,6 +168,22 @@ export default function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+  path="/company-master/add-branch"
+  element={
+    <ProtectedRoute roles={['superadmin']}>
+      <AddBranch />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/my-branches"
+  element={
+    <ProtectedRoute roles={['owner']}>
+      <MyBranchesOverview />
+    </ProtectedRoute>
+  }
+/>
       <Route
         path="/superadmin/dashboard"
         element={

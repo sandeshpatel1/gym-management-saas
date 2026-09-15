@@ -141,11 +141,14 @@ const manage = (company) => {
 
   return (
     <DashboardLayout title="Company Master">
-      <div className="flex justify-end mb-4">
-        <Button onClick={() => setModalOpen(true)}>
-          <Plus size={16} /> Onboard Gym
-        </Button>
-      </div>
+      <div className="flex justify-end gap-2 mb-4">
+  <Button variant="secondary" onClick={() => navigate('/company-master/add-branch')}>
+    <GitBranch size={16} /> Add Branch to Owner
+  </Button>
+  <Button onClick={() => setModalOpen(true)}>
+    <Plus size={16} /> Onboard Gym
+  </Button>
+</div>
 
       <Card>
         {loading ? (

@@ -6,7 +6,9 @@ const Company = require('../models/Company');
  * @desc  List staff users (the "User Master" table). Owners/managers see only
  *        their own company's staff. Superadmin sees every staff account on
  *        the platform, each populated with which gym it belongs to, and can
- *        optionally filter to one gym with ?company=<companyId>.
+ *        optionally filter to one gym with ?company=<companyId> or one role
+ *        with ?role=owner (used by the "Add Branch" page to list owners a
+ *        new branch can be linked to).
  * @route GET /api/users
  * @access Private (owner, manager, superadmin)
  */
@@ -14,6 +16,9 @@ const getUsers = asyncHandler(async (req, res) => {
   const filter = req.user.role === 'superadmin' ? {} : { company: req.user.company };
   if (req.user.role === 'superadmin' && req.query.company) {
     filter.company = req.query.company;
+  }
+  if (req.user.role === 'superadmin' && req.query.role) {
+    filter.role = req.query.role;
   }
 
   const users = await User.find(filter)

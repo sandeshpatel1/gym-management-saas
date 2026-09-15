@@ -12,9 +12,10 @@ export const getUpiQrPreviewApi = (companyId, amount, note) =>
     .get(`/companies/${companyId}/upi-qr`, { params: { amount, note }, responseType: 'blob' })
     .then((r) => r.data);
 
-// --- Multi-branch (owner) ---
+// --- Multi-branch ---
 export const getMyBranchesApi = () => axiosClient.get('/companies/my-branches').then((r) => r.data);
-export const createBranchApi = (payload) =>
-  axiosClient.post('/companies/branches', payload).then((r) => r.data);
 export const removeBranchApi = (companyId) =>
   axiosClient.delete(`/companies/branches/${companyId}`).then((r) => r.data);
+// Superadmin only - onboard a new branch and link it to an existing owner.
+export const createBranchForOwnerApi = (payload) =>
+  axiosClient.post('/companies/branches', payload).then((r) => r.data);

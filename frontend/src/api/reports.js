@@ -1,7 +1,10 @@
 import axiosClient from './axiosClient';
 
 export const getPlatformStatsApi = () => axiosClient.get('/reports/platform').then((r) => r.data);
-export const getDashboardStatsApi = () => axiosClient.get('/reports/dashboard').then((r) => r.data);
+// Optional companyId lets the owner's "All Branches" rollup page pull
+// stats for a specific branch regardless of which one is currently active.
+export const getDashboardStatsApi = (companyId) =>
+  axiosClient.get('/reports/dashboard', { params: companyId ? { company: companyId } : undefined }).then((r) => r.data);
 export const getRevenueReportApi = (from, to) =>
   axiosClient.get('/reports/revenue', { params: { from, to } }).then((r) => r.data);
 

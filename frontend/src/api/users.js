@@ -5,3 +5,7 @@ export const createUserApi = (payload) => axiosClient.post('/users', payload).th
 export const updateUserApi = (id, payload) =>
   axiosClient.put(`/users/${id}`, payload).then((r) => r.data);
 export const deleteUserApi = (id) => axiosClient.delete(`/users/${id}`).then((r) => r.data);
+
+// Superadmin only - list every owner login on the platform, used by the
+// "Add Branch" page to pick which owner a new branch gets linked to.
+export const getOwnersApi = () => axiosClient.get('/users', { params: { role: 'owner' } }).then((r) => r.data);

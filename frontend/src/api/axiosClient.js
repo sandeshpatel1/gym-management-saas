@@ -8,11 +8,13 @@ axiosClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('gym_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
 
-  // If a superadmin is currently "managing" a gym, scope every request to
-  // that gym automatically (the backend reads ?company=<id> for superadmin
-  // requests on company-scoped routes).
+  // If a superadmin/owner is currently "managing" a gym, scope every
+  // request to that gym automatically - UNLESS the caller already passed
+  // an explicit `company` param (e.g. the owner's "All Branches" rollup
+  // page, which needs to query several branches in one screen regardless
+  // of which one is currently active in the sidebar).
   const managingCompanyId = sessionStorage.getItem('gym_managing_company_id');
-  if (managingCompanyId) {
+  if (managingCompanyId && !config.params?.company) {
     config.params = { ...(config.params || {}), company: managingCompanyId };
   }
 
