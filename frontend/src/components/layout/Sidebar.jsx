@@ -71,9 +71,7 @@ export default function Sidebar() {
             <NavLink to="/members/new" className={linkClass}>
               <UserPlus size={18} /> Register Member
             </NavLink>
-            <NavLink to="/superadmin/payment-methods" className={linkClass}>
-              <Wallet size={18} /> Payment Methods
-            </NavLink>
+            
             <NavLink to="/follow-ups" className={linkClass}>
               <PhoneCall size={18} /> Follow-ups
             </NavLink>
@@ -105,19 +103,22 @@ export default function Sidebar() {
           </>
         )}
 
-        {isSuperadmin && !isManaging && (
-          <>
-            <NavLink to="/superadmin/dashboard" className={linkClass}>
-              <LayoutDashboard size={18} /> Dashboard
-            </NavLink>
-            <NavLink to="/company-master" className={linkClass}>
-              <Building2 size={18} /> Company Master
-            </NavLink>
-            <NavLink to="/superadmin/users" className={linkClass}>
-              <UsersRound size={18} /> All Users
-            </NavLink>
-          </>
-        )}
+{isSuperadmin && !isManaging && (
+  <>
+    <NavLink to="/superadmin/dashboard" className={linkClass}>
+      <LayoutDashboard size={18} /> Dashboard
+    </NavLink>
+    <NavLink to="/company-master" className={linkClass}>
+      <Building2 size={18} /> Company Master
+    </NavLink>
+    <NavLink to="/superadmin/users" className={linkClass}>
+      <UsersRound size={18} /> All Users
+    </NavLink>
+    <NavLink to="/superadmin/payment-methods" className={linkClass}>
+      <Wallet size={18} /> Payment Methods
+    </NavLink>
+  </>
+)}
       </nav>
 
       <div className="px-6 pb-3">

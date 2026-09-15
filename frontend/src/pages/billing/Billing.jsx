@@ -34,6 +34,7 @@ import {
 } from '../../api/payments';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 function dueMeta(dueDate) {
   if (!dueDate) return { label: '—', tone: 'text-ink-tertiary' };
@@ -75,6 +76,8 @@ export default function Billing() {
   const [collectTarget, setCollectTarget] = useState(null);
   const [collectAmount, setCollectAmount] = useState('');
   const [collectMethod, setCollectMethod] = useState('cash');
+  const [collectDate, setCollectDate] = useState(todayStr());
+  const [collectNextDueDate, setCollectNextDueDate] = useState('');
   const [collecting, setCollecting] = useState(false);
 
   const [refundTarget, setRefundTarget] = useState(null);
@@ -122,21 +125,39 @@ export default function Billing() {
     [dues]
   );
 
-  // --- Collect payment ---
+  // --- Collect payment (supports partial / multi-installment collection) ---
   const openCollect = (payment) => {
     setCollectTarget(payment);
     setCollectAmount(String(payment.amountDue));
     setCollectMethod(payment.method || 'cash');
+    setCollectDate(todayStr());
+    setCollectNextDueDate('');
   };
+
+  const collectRemaining = useMemo(() => {
+    if (!collectTarget) return 0;
+    return Math.max(0, +(collectTarget.amountDue - Number(collectAmount || 0)).toFixed(2));
+  }, [collectTarget, collectAmount]);
+
+  const installmentNumber = (collectTarget?.installments?.length || 0) + 1;
 
   const submitCollect = async () => {
     const amt = Number(collectAmount);
     if (!amt || amt <= 0) return toast.error('Enter a valid amount');
     if (amt > collectTarget.amountDue) return toast.error('Amount exceeds the outstanding due');
+    if (!collectDate) return toast.error('Select the date this payment was received');
+    if (collectRemaining > 0 && !collectNextDueDate) {
+      return toast.error('Set the next due date for the remaining balance');
+    }
     setCollecting(true);
     try {
-      await collectDueApi(collectTarget._id, { amount: amt, method: collectMethod });
-      toast.success('Payment collected');
+      await collectDueApi(collectTarget._id, {
+        amount: amt,
+        method: collectMethod,
+        paidAt: collectDate,
+        nextDueDate: collectRemaining > 0 ? collectNextDueDate : undefined,
+      });
+      toast.success(collectRemaining > 0 ? 'Installment recorded' : 'Payment collected in full');
       setCollectTarget(null);
       load();
     } catch (err) {
@@ -295,6 +316,11 @@ export default function Billing() {
                         {new Date(p.dueDate).toLocaleDateString()}
                       </p>
                     )}
+                    {p.installments?.length > 1 && (
+                      <p className="text-[10px] text-ink-tertiary dark:text-zinc-500">
+                        {p.installments.length} installments so far
+                      </p>
+                    )}
                     {p.reminderCount > 0 && (
                       <p className="text-[10px] text-ink-tertiary dark:text-zinc-500">
                         Reminded {p.reminderCount}x
@@ -365,25 +391,35 @@ export default function Billing() {
         )}
       </Card>
 
-      {/* --- Collect Payment modal --- */}
+      {/* --- Collect Payment modal (supports partial / multi-installment) --- */}
       <Modal open={!!collectTarget} onClose={() => setCollectTarget(null)} title="Collect Payment">
         {collectTarget && (
           <div className="space-y-4">
             <div className="bg-surface-subtle dark:bg-white/[0.04] rounded-xl p-4">
               <p className="text-[13px] text-ink-secondary dark:text-zinc-400">
-                {collectTarget.member?.fullName} · {collectTarget.invoiceNumber}
+                {collectTarget.member?.fullName} · {collectTarget.invoiceNumber} · Installment #{installmentNumber}
               </p>
               <p className="text-[20px] font-semibold text-red-500 mt-1">
                 ₹{collectTarget.amountDue.toLocaleString('en-IN')} outstanding
               </p>
             </div>
-            <Input
-              label="Amount Received"
-              type="number"
-              step="0.01"
-              value={collectAmount}
-              onChange={(e) => setCollectAmount(e.target.value)}
-            />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                label="Amount Received"
+                type="number"
+                step="0.01"
+                value={collectAmount}
+                onChange={(e) => setCollectAmount(e.target.value)}
+              />
+              <Input
+                label="Date Received"
+                type="date"
+                value={collectDate}
+                onChange={(e) => setCollectDate(e.target.value)}
+              />
+            </div>
+
             <Select label="Payment Method" value={collectMethod} onChange={(e) => setCollectMethod(e.target.value)}>
               <option value="cash">Cash</option>
               <option value="card">Card</option>
@@ -391,8 +427,23 @@ export default function Billing() {
               <option value="bank-transfer">Bank Transfer</option>
               <option value="other">Other</option>
             </Select>
+
+            {collectRemaining > 0 && (
+              <div className="p-4 bg-amber-50 dark:bg-amber-500/[0.08] border border-amber-200 dark:border-amber-500/20 rounded-xl space-y-3">
+                <p className="text-[13px] text-amber-800 dark:text-amber-400 font-medium">
+                  ₹{collectRemaining.toLocaleString('en-IN')} will still be due after this installment.
+                </p>
+                <Input
+                  label="Next Due Date"
+                  type="date"
+                  value={collectNextDueDate}
+                  onChange={(e) => setCollectNextDueDate(e.target.value)}
+                />
+              </div>
+            )}
+
             <Button className="w-full" loading={collecting} onClick={submitCollect}>
-              Confirm Collection
+              {collectRemaining > 0 ? 'Record Installment' : 'Confirm Collection'}
             </Button>
           </div>
         )}

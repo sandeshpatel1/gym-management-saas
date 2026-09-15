@@ -8,14 +8,36 @@ const mongoose = require('mongoose');
  * revenue aggregations that sum `amount` are unaffected). `invoiceAmount` is
  * what was actually billed; when it's not supplied it defaults to `amount`,
  * so old callers (member registration, renewal) keep working with zero dues.
+ *
+ * `installments` is the per-receipt history: one entry per actual money
+ * receipt (the initial payment at registration/renewal, plus every later
+ * `collectDue` call). This is what revenue reporting sums by DATE now,
+ * instead of relying on invoice `status` - so a partial payment counts as
+ * revenue the day it's actually received, not only once the invoice is
+ * fully settled.
  */
+const installmentSchema = new mongoose.Schema(
+  {
+    amount: { type: Number, required: true, min: 0 },
+    method: {
+      type: String,
+      enum: ['cash', 'card', 'upi', 'bank-transfer', 'other'],
+      default: 'cash',
+    },
+    paidAt: { type: Date, default: Date.now },
+    collectedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    note: { type: String, trim: true, maxlength: 200 },
+  },
+  { _id: true, timestamps: true }
+);
+
 const paymentSchema = new mongoose.Schema(
   {
     company: { type: mongoose.Schema.Types.ObjectId, ref: 'Company', required: true },
     member: { type: mongoose.Schema.Types.ObjectId, ref: 'Member', required: true },
     plan: { type: mongoose.Schema.Types.ObjectId, ref: 'MembershipPlan' },
     invoiceNumber: { type: String, required: true, trim: true },
-    amount: { type: Number, required: true, min: 0 }, // amount actually received
+    amount: { type: Number, required: true, min: 0 }, // amount actually received (cumulative)
     method: {
       type: String,
       enum: ['cash', 'card', 'upi', 'bank-transfer', 'other'],
@@ -35,6 +57,9 @@ const paymentSchema = new mongoose.Schema(
     amountDue: { type: Number, default: 0 },
     dueDate: { type: Date },
     status: { type: String, enum: ['paid', 'partial', 'pending', 'refunded'], default: 'paid' },
+
+    // --- Per-installment receipt history (see comment above) ---
+    installments: [installmentSchema],
 
     // --- Refunds ---
     refund: {
@@ -65,6 +90,23 @@ paymentSchema.pre('validate', function (next) {
   if (!this.isModified('status') || !this.status) {
     this.status = this.amountDue <= 0 ? 'paid' : this.amount > 0 ? 'partial' : 'pending';
   }
+
+  // On creation only: seed the installment history with the initial receipt
+  // so every payment - registration, renewal, standalone, gateway - has at
+  // least one installment entry from day one without every caller needing
+  // to know about this field.
+  if (this.isNew && (!this.installments || this.installments.length === 0) && this.amount > 0) {
+    this.installments = [
+      {
+        amount: this.amount,
+        method: this.method,
+        paidAt: this.paidAt || new Date(),
+        collectedBy: this.receivedBy,
+        note: 'Initial payment',
+      },
+    ];
+  }
+
   next();
 });
 
@@ -73,5 +115,6 @@ paymentSchema.index({ company: 1, paidAt: 1 });
 paymentSchema.index({ company: 1, member: 1 });
 paymentSchema.index({ company: 1, amountDue: 1 });
 paymentSchema.index({ company: 1, dueDate: 1 });
+paymentSchema.index({ company: 1, 'installments.paidAt': 1 });
 
 module.exports = mongoose.model('Payment', paymentSchema);

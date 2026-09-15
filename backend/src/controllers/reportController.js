@@ -6,6 +6,22 @@ const Attendance = require('../models/Attendance');
 const Company = require('../models/Company');
 const User = require('../models/User');
 
+// Normalizes pre-installment-tracking Payment docs by synthesizing a single
+// installment from `amount`/`paidAt` when the `installments` array is
+// empty, so revenue aggregations never silently drop older payments that
+// predate this feature. New/updated payments always have real entries here.
+const normalizeInstallmentsStage = {
+  $addFields: {
+    installments: {
+      $cond: [
+        { $gt: [{ $size: { $ifNull: ['$installments', []] } }, 0] },
+        '$installments',
+        [{ amount: '$amount', paidAt: '$paidAt' }],
+      ],
+    },
+  },
+};
+
 /**
  * @desc  Platform-wide overview for the superadmin dashboard: how many gyms
  *        exist and how many are active, staff headcount by role, total
@@ -50,6 +66,9 @@ const getPlatformStats = asyncHandler(async (req, res) => {
 /**
  * @desc  Dashboard summary cards: total members, active members, today's attendance,
  *        this month's revenue, expiring-soon count.
+ *        Revenue is summed by INSTALLMENT date, not invoice status - so a
+ *        partial payment counts the moment it's received, not only once
+ *        the invoice is fully paid off.
  * @route GET /api/reports/dashboard
  * @access Private
  */
@@ -69,8 +88,11 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       Member.countDocuments({ company, status: 'active' }),
       Attendance.countDocuments({ company, date: today }),
       Payment.aggregate([
-        { $match: { company, status: 'paid', paidAt: { $gte: startOfMonth } } },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
+        { $match: { company, status: { $ne: 'refunded' } } },
+        normalizeInstallmentsStage,
+        { $unwind: '$installments' },
+        { $match: { 'installments.paidAt': { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$installments.amount' } } },
       ]),
       Member.countDocuments({
         company,
@@ -92,32 +114,51 @@ const getDashboardStats = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc  Revenue report grouped by day within a date range
+ * @desc  Revenue report grouped by day within a date range. Sums by the
+ *        date each INSTALLMENT was actually received (see
+ *        normalizeInstallmentsStage above), so partial payments show up on
+ *        the day the money came in rather than being invisible until the
+ *        invoice is fully settled.
  * @route GET /api/reports/revenue?from=&to=
  * @access Private
  */
 const getRevenueReport = asyncHandler(async (req, res) => {
   const { from, to } = req.query;
-  const match = { company: req.user.company, status: 'paid' };
-  if (from || to) {
-    match.paidAt = {};
-    if (from) match.paidAt.$gte = new Date(from);
-    if (to) match.paidAt.$lte = new Date(to);
+  const match = { company: req.user.company, status: { $ne: 'refunded' } };
+
+  const dateFilter = {};
+  if (from) dateFilter.$gte = new Date(from);
+  if (to) {
+    // Include the WHOLE end day - `new Date(to)` alone is midnight, which
+    // was silently dropping every transaction from the last day of range.
+    const toEnd = new Date(to);
+    toEnd.setHours(23, 59, 59, 999);
+    dateFilter.$lte = toEnd;
   }
+
+  const basePipeline = [
+    { $match: match },
+    normalizeInstallmentsStage,
+    { $unwind: '$installments' },
+    ...(from || to ? [{ $match: { 'installments.paidAt': dateFilter } }] : []),
+  ];
 
   const [byDay, totalAgg] = await Promise.all([
     Payment.aggregate([
-      { $match: match },
+      ...basePipeline,
       {
         $group: {
-          _id: { $dateToString: { format: '%Y-%m-%d', date: '$paidAt' } },
-          total: { $sum: '$amount' },
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$installments.paidAt' } },
+          total: { $sum: '$installments.amount' },
           count: { $sum: 1 },
         },
       },
       { $sort: { _id: 1 } },
     ]),
-    Payment.aggregate([{ $match: match }, { $group: { _id: null, total: { $sum: '$amount' } } }]),
+    Payment.aggregate([
+      ...basePipeline,
+      { $group: { _id: null, total: { $sum: '$installments.amount' } } },
+    ]),
   ]);
 
   res.json({
@@ -127,27 +168,50 @@ const getRevenueReport = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc  Export the revenue report as a PDF
+ * @desc  Export the revenue report as a PDF - one row per installment
+ *        actually received within the date range (falling back to the
+ *        whole payment for pre-migration records with no installments).
  * @route GET /api/reports/revenue/export?from=&to=
  * @access Private
  */
 const exportRevenuePdf = asyncHandler(async (req, res) => {
   const { from, to } = req.query;
-  const match = { company: req.user.company, status: 'paid' };
-  if (from || to) {
-    match.paidAt = {};
-    if (from) match.paidAt.$gte = new Date(from);
-    if (to) match.paidAt.$lte = new Date(to);
+  const fromDate = from ? new Date(from) : null;
+  let toDate = null;
+  if (to) {
+    toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
   }
 
   const [company, payments] = await Promise.all([
     Company.findById(req.user.company),
-    Payment.find(match).populate('member', 'fullName memberCode').populate('plan', 'name').sort({
-      paidAt: 1,
-    }),
+    Payment.find({ company: req.user.company, status: { $ne: 'refunded' } })
+      .populate('member', 'fullName memberCode')
+      .populate('plan', 'name')
+      .sort({ paidAt: 1 }),
   ]);
 
-  const total = payments.reduce((sum, p) => sum + p.amount, 0);
+  const rows = [];
+  payments.forEach((p) => {
+    const installments = p.installments?.length
+      ? p.installments
+      : [{ amount: p.amount, paidAt: p.paidAt }];
+    installments.forEach((inst) => {
+      const d = new Date(inst.paidAt);
+      if (fromDate && d < fromDate) return;
+      if (toDate && d > toDate) return;
+      rows.push({
+        date: d,
+        invoiceNumber: p.invoiceNumber,
+        memberName: p.member?.fullName || '-',
+        planName: p.plan?.name || '-',
+        amount: inst.amount,
+      });
+    });
+  });
+  rows.sort((a, b) => a.date - b.date);
+
+  const total = rows.reduce((sum, r) => sum + r.amount, 0);
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'attachment; filename="revenue-report.pdf"');
@@ -161,7 +225,6 @@ const exportRevenuePdf = asyncHandler(async (req, res) => {
   );
   doc.moveDown(1);
 
-  // Table header
   const startX = 40;
   let y = doc.y;
   doc.fontSize(10).fillColor('#000');
@@ -174,17 +237,17 @@ const exportRevenuePdf = asyncHandler(async (req, res) => {
   doc.moveTo(startX, y).lineTo(555, y).strokeColor('#ccc').stroke();
   y += 6;
 
-  payments.forEach((p) => {
+  rows.forEach((r) => {
     if (y > 760) {
       doc.addPage();
       y = 40;
     }
     doc.fontSize(9).fillColor('#111');
-    doc.text(new Date(p.paidAt).toLocaleDateString(), startX, y, { width: 80 });
-    doc.text(p.invoiceNumber, startX + 80, y, { width: 90 });
-    doc.text(p.member?.fullName || '-', startX + 170, y, { width: 140 });
-    doc.text(p.plan?.name || '-', startX + 310, y, { width: 110 });
-    doc.text(`Rs. ${p.amount.toFixed(2)}`, startX + 420, y, { width: 80, align: 'right' });
+    doc.text(r.date.toLocaleDateString(), startX, y, { width: 80 });
+    doc.text(r.invoiceNumber, startX + 80, y, { width: 90 });
+    doc.text(r.memberName, startX + 170, y, { width: 140 });
+    doc.text(r.planName, startX + 310, y, { width: 110 });
+    doc.text(`Rs. ${r.amount.toFixed(2)}`, startX + 420, y, { width: 80, align: 'right' });
     y += 16;
   });
 

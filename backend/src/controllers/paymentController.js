@@ -76,14 +76,19 @@ const createPayment = asyncHandler(async (req, res) => {
 });
 
 /**
+/**
  * @desc  Record an additional payment against an invoice that still has
- *        an outstanding due (partial-payment collection). Never exceeds
- *        the remaining amountDue.
+ *        an outstanding due (partial-payment / installment collection).
+ *        Never exceeds the remaining amountDue. Accepts the ACTUAL date
+ *        this installment was received (defaults to now) so revenue
+ *        reporting attributes the money to the right day, and an optional
+ *        `nextDueDate` to reschedule the following installment when money
+ *        is still owed after this one.
  * @route POST /api/payments/:id/collect
  * @access Private (owner, manager)
  */
 const collectDue = asyncHandler(async (req, res) => {
-  const { amount, method } = req.body;
+  const { amount, method, paidAt, note, nextDueDate } = req.body;
   const amt = Number(amount);
   if (!amt || amt <= 0) {
     res.status(400);
@@ -104,10 +109,55 @@ const collectDue = asyncHandler(async (req, res) => {
     throw new Error(`Amount exceeds outstanding due of Rs. ${payment.amountDue.toFixed(2)}`);
   }
 
+  const installmentDate = paidAt ? new Date(paidAt) : new Date();
+  if (Number.isNaN(installmentDate.getTime())) {
+    res.status(400);
+    throw new Error('Enter a valid payment date');
+  }
+
+  // Backfill: a payment created before installment tracking existed has no
+  // history yet even though it already has money received (`amount` > 0).
+  // Seed that original receipt as the first installment before adding the
+  // new one, so revenue reporting doesn't lose the earlier portion.
+  if (!payment.installments || payment.installments.length === 0) {
+    if (payment.amount > 0) {
+      payment.installments.push({
+        amount: payment.amount,
+        method: payment.method,
+        paidAt: payment.paidAt,
+        collectedBy: payment.receivedBy,
+        note: 'Initial payment (migrated)',
+      });
+    }
+  }
+
+  payment.installments.push({
+    amount: amt,
+    method: method || payment.method,
+    paidAt: installmentDate,
+    collectedBy: req.user._id,
+    note: note || undefined,
+  });
+
   payment.amount = +(payment.amount + amt).toFixed(2);
   payment.amountDue = Math.max(0, +(payment.amountDue - amt).toFixed(2));
   payment.status = payment.amountDue <= 0 ? 'paid' : 'partial';
   if (method) payment.method = method;
+
+  if (payment.amountDue > 0) {
+    // Still owes something - let staff (re)schedule when the rest is due.
+    if (nextDueDate) {
+      const nd = new Date(nextDueDate);
+      if (Number.isNaN(nd.getTime())) {
+        res.status(400);
+        throw new Error('Enter a valid next due date');
+      }
+      payment.dueDate = nd;
+    }
+  } else {
+    payment.dueDate = undefined; // fully settled - clear the due date
+  }
+
   await payment.save();
 
   const populated = await payment.populate([
