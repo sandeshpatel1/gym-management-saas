@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Plus, Building2, Pencil, UsersRound, LogInIcon } from 'lucide-react';
+import { Plus, Building2, Pencil, UsersRound, LogInIcon, GitBranch } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Card from '../../components/ui/Card';
@@ -33,15 +33,10 @@ export default function CompanyMaster() {
 
   const { startManaging } = useAuth();
 
-const manage = (company) => {
-  startManaging(company);
-  navigate('/dashboard');
-};
-
-
-
-
-
+  const manage = (company) => {
+    startManaging(company);
+    navigate('/dashboard');
+  };
 
   const load = async () => {
     setLoading(true);
@@ -137,18 +132,16 @@ const manage = (company) => {
     }
   };
 
-
-
   return (
     <DashboardLayout title="Company Master">
       <div className="flex justify-end gap-2 mb-4">
-  <Button variant="secondary" onClick={() => navigate('/company-master/add-branch')}>
-    <GitBranch size={16} /> Add Branch to Owner
-  </Button>
-  <Button onClick={() => setModalOpen(true)}>
-    <Plus size={16} /> Onboard Gym
-  </Button>
-</div>
+        <Button variant="secondary" onClick={() => navigate('/company-master/add-branch')}>
+          <GitBranch size={16} /> Add Branch to Owner
+        </Button>
+        <Button onClick={() => setModalOpen(true)}>
+          <Plus size={16} /> Onboard Gym
+        </Button>
+      </div>
 
       <Card>
         {loading ? (
@@ -182,8 +175,8 @@ const manage = (company) => {
                       <UsersRound size={13} /> Users
                     </Button>
                     <Button size="sm" onClick={() => manage(c)}>
-                    <LogInIcon size={13} /> Manage
-                  </Button>
+                      <LogInIcon size={13} /> Manage
+                    </Button>
                     <Button variant="secondary" size="sm" onClick={() => openEdit(c)}>
                       <Pencil size={13} /> Edit
                     </Button>
@@ -265,12 +258,12 @@ const manage = (company) => {
             <option value="enterprise">Enterprise</option>
           </Select>
           <ImagePicker
-                label="Logo"
-                value={editForm.watch('logoUrl')}
-                onChange={(val) => editForm.setValue('logoUrl', val, { shouldDirty: true })}
-                shape="square"
-                size={80}
-              />
+            label="Logo"
+            value={editForm.watch('logoUrl')}
+            onChange={(val) => editForm.setValue('logoUrl', val, { shouldDirty: true })}
+            shape="square"
+            size={80}
+          />
           <Input label="Tagline" {...editForm.register('tagline')} />
           <label className="block">
             <span className="block text-[13px] font-medium text-ink-secondary mb-1.5">Brand Color</span>

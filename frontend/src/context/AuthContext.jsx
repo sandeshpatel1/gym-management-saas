@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { loginApi, getMeApi } from '../api/auth';
+import { getMyBranchesApi } from '../api/companies';
 
 const AuthContext = createContext(null);
 const MANAGING_ID_KEY = 'gym_managing_company_id';
@@ -39,6 +40,29 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : null;
   });
 
+  // Branch list lives HERE (app root, never remounts on navigation) rather
+  // than in a per-component hook - Sidebar/BranchSwitcher get remounted on
+  // every route change since each page wraps its own <DashboardLayout>, so
+  // a hook-local fetch there re-runs (and briefly empties out) on every nav.
+  const [branches, setBranches] = useState([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
+
+  const loadBranches = useCallback(async (role) => {
+    if (role !== 'owner') {
+      setBranches([]);
+      return;
+    }
+    setBranchesLoading(true);
+    try {
+      const { data } = await getMyBranchesApi();
+      setBranches(data);
+    } catch {
+      /* switcher/rollup just won't populate - everything else keeps working */
+    } finally {
+      setBranchesLoading(false);
+    }
+  }, []);
+
   const bootstrap = useCallback(async () => {
     const token = localStorage.getItem('gym_token');
     if (!token) {
@@ -51,13 +75,14 @@ export function AuthProvider({ children }) {
       const raw = sessionStorage.getItem(MANAGING_OBJ_KEY);
       const managing = raw ? JSON.parse(raw) : null;
       applyBranding(managing?.branding || me?.company?.branding);
+      await loadBranches(me?.role);
     } catch {
       localStorage.removeItem('gym_token');
       localStorage.removeItem('gym_user');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadBranches]);
 
   useEffect(() => {
     bootstrap();
@@ -72,6 +97,7 @@ export function AuthProvider({ children }) {
     setManagingCompanyState(null);
     setUser(data.user);
     applyBranding(data.user?.company?.branding);
+    await loadBranches(data.user?.role);
     return data.user;
   };
 
@@ -82,6 +108,7 @@ export function AuthProvider({ children }) {
     sessionStorage.removeItem(MANAGING_OBJ_KEY);
     setManagingCompanyState(null);
     setUser(null);
+    setBranches([]);
     applyBranding(null);
   };
 
@@ -128,6 +155,9 @@ export function AuthProvider({ children }) {
         stopManaging,
         effectiveCompany,
         isEffectiveOwner,
+        branches,
+        branchesLoading,
+        reloadBranches: () => loadBranches(user?.role),
       }}
     >
       {children}

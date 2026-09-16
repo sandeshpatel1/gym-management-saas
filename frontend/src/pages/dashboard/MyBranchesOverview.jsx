@@ -9,7 +9,7 @@ import Button from '../../components/ui/Button';
 import CompanyLogo from '../../components/common/CompanyLogo';
 import EmptyState from '../../components/ui/EmptyState';
 import { useAuth } from '../../context/AuthContext';
-import { getMyBranchesApi } from '../../api/companies';
+import { useMyBranches } from '../../hooks/useMyBranches';
 import { getDashboardStatsApi } from '../../api/reports';
 
 export default function MyBranchesOverview() {
@@ -19,11 +19,13 @@ export default function MyBranchesOverview() {
   const [statsByBranch, setStatsByBranch] = useState({});
   const [loading, setLoading] = useState(true);
 
+  const { branches: myBranches } = useMyBranches();
+
   useEffect(() => {
     (async () => {
       setLoading(true);
       try {
-        const { data } = await getMyBranchesApi();
+        const data = myBranches;
         setBranches(data);
         const entries = await Promise.all(
           data.map(async (b) => {
