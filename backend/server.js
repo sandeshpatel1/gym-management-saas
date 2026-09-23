@@ -14,6 +14,7 @@ const rateLimit = require('express-rate-limit');
 
 const connectDB = require('./src/config/db');
 const { errorHandler, notFound } = require('./src/middleware/errorHandler');
+const { auditWriteActions } = require('./src/middleware/auditLogger');
 
 // Routes
 const authRoutes = require('./src/routes/authRoutes');
@@ -28,6 +29,7 @@ const followUpRoutes = require('./src/routes/followUpRoutes');
 const kioskRoutes = require('./src/routes/kioskRoutes');
 const photoSessionRoutes = require('./src/routes/photoSessionRoutes');
 const platformSettingsRoutes = require('./src/routes/platformSettingsRoutes');
+const impersonationRoutes = require('./src/routes/impersonationRoutes');
 
 const app = express();
 
@@ -48,6 +50,12 @@ app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 app.use(mongoSanitize());
+
+// Sees every request's final outcome (req.user, query params, response
+// status) once the whole chain has run - logs superadmin write actions
+// made while managing a gym. Must be mounted before the routers below so
+// its res.on('finish') listener is registered before any response sends.
+app.use(auditWriteActions);
 
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
@@ -97,6 +105,7 @@ app.use('/api/follow-ups', followUpRoutes);
 app.use('/api/kiosk', kioskRoutes);
 app.use('/api/photo-sessions', photoSessionRoutes);
 app.use('/api/platform-settings', platformSettingsRoutes);
+app.use('/api/impersonation', impersonationRoutes);
 
 // --------------------------------------------------
 // 404 + Error Handler

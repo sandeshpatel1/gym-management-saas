@@ -24,6 +24,7 @@ import Profile from './pages/profile/Profile';
 import MemberEdit from './pages/members/MemberEdit';
 import PhotoCapture from './pages/members/PhotoCapture';
 import PlatformPaymentSettings from './pages/superadmin/PlatformPaymentSettings';
+import ImpersonationLogs from './pages/superadmin/ImpersonationLogs';
 import AddBranch from './pages/company/AddBranch';
 import MyBranchesOverview from './pages/dashboard/MyBranchesOverview';
 
@@ -217,6 +218,14 @@ export default function App() {
           element={
             <ProtectedRoute roles={['superadmin']}>
               <PlatformPaymentSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superadmin/audit-log"
+          element={
+            <ProtectedRoute roles={['superadmin']}>
+              <ImpersonationLogs />
             </ProtectedRoute>
           }
         />

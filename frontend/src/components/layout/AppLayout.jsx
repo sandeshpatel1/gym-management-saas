@@ -37,6 +37,7 @@ const PAGE_TITLES = [
   { path: '/superadmin/dashboard', title: 'Platform Overview' },
   { path: '/superadmin/users', title: 'All Users' },
   { path: '/superadmin/payment-methods', title: 'Payment Methods & Gateways' },
+  { path: '/superadmin/audit-log', title: 'Impersonation Audit Log' },
 ];
 
 function resolveTitle(pathname) {

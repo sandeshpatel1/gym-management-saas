@@ -14,6 +14,7 @@ import {
   LogOut,
   Wallet,
   Layers,
+  ShieldAlert,
 } from 'lucide-react';
 import CompanyLogo from '../common/CompanyLogo';
 import BranchSwitcher from '../common/BranchSwitcher';
@@ -127,6 +128,9 @@ export default function Sidebar() {
             </NavLink>
             <NavLink to="/superadmin/payment-methods" className={linkClass}>
               <Wallet size={18} /> Payment Methods
+            </NavLink>
+            <NavLink to="/superadmin/audit-log" className={linkClass}>
+              <ShieldAlert size={18} /> Audit Log
             </NavLink>
           </>
         )}

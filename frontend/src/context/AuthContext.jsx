@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { loginApi, getMeApi } from '../api/auth';
 import { getMyBranchesApi } from '../api/companies';
+import { startImpersonationApi, endImpersonationApi } from '../api/impersonation';
 
 const AuthContext = createContext(null);
 const MANAGING_ID_KEY = 'gym_managing_company_id';
@@ -102,6 +103,12 @@ export function AuthProvider({ children }) {
   };
 
   const logout = () => {
+    // If a superadmin logs out while still "managing" a gym, that's an
+    // implicit end of the impersonation session - log it before clearing
+    // the state that identifies which gym it was.
+    if (user?.role === 'superadmin' && managingCompany?.id) {
+      endImpersonationApi(managingCompany.id).catch(() => {});
+    }
     localStorage.removeItem('gym_token');
     localStorage.removeItem('gym_user');
     sessionStorage.removeItem(MANAGING_ID_KEY);
@@ -124,9 +131,20 @@ export function AuthProvider({ children }) {
     sessionStorage.setItem(MANAGING_OBJ_KEY, JSON.stringify(normalized));
     setManagingCompanyState(normalized);
     applyBranding(normalized.branding);
+
+    // Only superadmin's "Manage this gym" is impersonation worth
+    // auditing - an owner switching between their own branches isn't
+    // accessing anyone else's data, so this is skipped for owners.
+    // Fire-and-forget: a logging hiccup should never block navigation.
+    if (user?.role === 'superadmin') {
+      startImpersonationApi(normalized.id).catch(() => {});
+    }
   };
 
   const stopManaging = () => {
+    if (user?.role === 'superadmin' && managingCompany?.id) {
+      endImpersonationApi(managingCompany.id).catch(() => {});
+    }
     sessionStorage.removeItem(MANAGING_ID_KEY);
     sessionStorage.removeItem(MANAGING_OBJ_KEY);
     setManagingCompanyState(null);
