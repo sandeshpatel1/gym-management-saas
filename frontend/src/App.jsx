@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/common/ProtectedRoute';
+import AppLayout from './components/layout/AppLayout';
 import { useAuth } from './context/AuthContext';
 
 import Login from './pages/auth/Login';
@@ -22,10 +23,9 @@ import Settings from './pages/settings/Settings';
 import Profile from './pages/profile/Profile';
 import MemberEdit from './pages/members/MemberEdit';
 import PhotoCapture from './pages/members/PhotoCapture';
-import PlatformPaymentSettings from './pages/superadmin/PlatformPaymentSettings'; // add with other imports
+import PlatformPaymentSettings from './pages/superadmin/PlatformPaymentSettings';
 import AddBranch from './pages/company/AddBranch';
 import MyBranchesOverview from './pages/dashboard/MyBranchesOverview';
-
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -46,54 +46,8 @@ export default function App() {
 
       <Route path="/" element={<RootRedirect />} />
 
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
-            <Dashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/members"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
-            <MemberList />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/members/new"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
-            <MemberForm />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/members/:id"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
-            <MemberProfile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/follow-ups"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
-            <FollowUps />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/attendance"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
-            <AttendanceMarking />
-          </ProtectedRoute>
-        }
-      />
+      {/* Full-screen kiosk display - deliberately outside AppLayout (no
+          sidebar/topbar chrome), but still requires a staff login. */}
       <Route
         path="/attendance/kiosk"
         element={
@@ -102,112 +56,171 @@ export default function App() {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/membership-plans"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
-            <MembershipPlans />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/reports"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
-            <RevenueReport />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/billing"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
-            <Billing />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/users"
-        element={
-          <ProtectedRoute roles={['owner', 'superadmin']} requireCompanyContext>
-            <UserManagement />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
-            <Settings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/members/:id/edit"
-        element={
-          <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
-            <MemberEdit />
-          </ProtectedRoute>
-        }
-      />
 
-      {/* --- Superadmin (platform-wide, not tied to one gym) --- */}
-      <Route
-        path="/company-master"
-        element={
-          <ProtectedRoute roles={['superadmin']}>
-            <CompanyMaster />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-  path="/company-master/add-branch"
-  element={
-    <ProtectedRoute roles={['superadmin']}>
-      <AddBranch />
-    </ProtectedRoute>
-  }
-/>
-<Route
-  path="/my-branches"
-  element={
-    <ProtectedRoute roles={['owner']}>
-      <MyBranchesOverview />
-    </ProtectedRoute>
-  }
-/>
-      <Route
-        path="/superadmin/dashboard"
-        element={
-          <ProtectedRoute roles={['superadmin']}>
-            <SuperAdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/superadmin/users"
-        element={
-          <ProtectedRoute roles={['superadmin']}>
-            <GlobalUsers />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-  path="/superadmin/payment-methods"
-  element={
-    <ProtectedRoute roles={['superadmin']}>
-      <PlatformPaymentSettings />
-    </ProtectedRoute>
-  }
-/>
+      {/* Everything below shares ONE persistent Sidebar/Topbar via AppLayout
+          instead of each page mounting its own - this is what stops the
+          sidebar/branch switcher from flickering on every navigation.
+          AppLayout's own ProtectedRoute only checks "is someone logged in";
+          each child route below still enforces its own role/company-scope
+          rules exactly as before. Page titles are resolved inside
+          AppLayout via matchPath against the current URL, not via `handle`
+          (that API needs a data router, which this app doesn't use). */}
+      <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/members"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
+              <MemberList />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/members/new"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
+              <MemberForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/members/:id"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
+              <MemberProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/follow-ups"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
+              <FollowUps />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/attendance"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
+              <AttendanceMarking />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/membership-plans"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'trainer', 'superadmin']} requireCompanyContext>
+              <MembershipPlans />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
+              <RevenueReport />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/billing"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
+              <Billing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute roles={['owner', 'superadmin']} requireCompanyContext>
+              <UserManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/members/:id/edit"
+          element={
+            <ProtectedRoute roles={['owner', 'manager', 'superadmin']} requireCompanyContext>
+              <MemberEdit />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* --- Superadmin (platform-wide, not tied to one gym) --- */}
+        <Route
+          path="/company-master"
+          element={
+            <ProtectedRoute roles={['superadmin']}>
+              <CompanyMaster />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/company-master/add-branch"
+          element={
+            <ProtectedRoute roles={['superadmin']}>
+              <AddBranch />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-branches"
+          element={
+            <ProtectedRoute roles={['owner']}>
+              <MyBranchesOverview />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superadmin/dashboard"
+          element={
+            <ProtectedRoute roles={['superadmin']}>
+              <SuperAdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superadmin/users"
+          element={
+            <ProtectedRoute roles={['superadmin']}>
+              <GlobalUsers />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/superadmin/payment-methods"
+          element={
+            <ProtectedRoute roles={['superadmin']}>
+              <PlatformPaymentSettings />
+            </ProtectedRoute>
+          }
+        />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
