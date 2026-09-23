@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { Plus, Building2, Pencil, UsersRound, LogInIcon, GitBranch } from 'lucide-react';
+import { Plus, Building2, Pencil, UsersRound, LogInIcon, GitBranch, CalendarClock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import Card from '../../components/ui/Card';
@@ -19,13 +19,25 @@ import {
   createCompanyApi,
   setCompanyStatusApi,
   updateCompanyApi,
+  updateSubscriptionApi,
 } from '../../api/companies';
+
+// Subscription badge: 'expired' (red) takes priority over plan; otherwise
+// green for anything paid, neutral for trial.
+function SubscriptionBadge({ subscription }) {
+  const status = subscription?.status;
+  const plan = subscription?.plan || 'trial';
+  if (status === 'expired') return <Badge status="expired">Expired</Badge>;
+  if (plan === 'trial') return <Badge status="pending">Trial</Badge>;
+  return <Badge status="active">{plan}</Badge>;
+}
 
 export default function CompanyMaster() {
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCompany, setEditingCompany] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
   const navigate = useNavigate();
 
   const createForm = useForm();
@@ -98,14 +110,18 @@ export default function CompanyMaster() {
       address: company.contact?.address || '',
       city: company.contact?.city || '',
       state: company.contact?.state || '',
-      plan: company.subscription?.plan || 'trial',
       logoUrl: company.branding?.logoUrl || '',
       primaryColor: company.branding?.primaryColor || '#0A84FF',
       tagline: company.branding?.tagline || '',
+      subPlan: company.subscription?.plan || 'trial',
+      subValidTill: company.subscription?.validTill
+        ? new Date(company.subscription.validTill).toISOString().slice(0, 10)
+        : '',
     });
   };
 
   const onEditSave = async (values) => {
+    setSavingEdit(true);
     try {
       await updateCompanyApi(editingCompany._id, {
         name: values.name,
@@ -116,7 +132,6 @@ export default function CompanyMaster() {
           city: values.city,
           state: values.state,
         },
-        subscription: { ...editingCompany.subscription, plan: values.plan },
         branding: {
           ...editingCompany.branding,
           logoUrl: values.logoUrl,
@@ -124,11 +139,33 @@ export default function CompanyMaster() {
           tagline: values.tagline,
         },
       });
+
+      // Only touch the subscription if something about it actually changed —
+      // renewing resets status back to 'active', so we don't want to fire
+      // this on every unrelated save.
+      const currentPlan = editingCompany.subscription?.plan || 'trial';
+      const currentValidTill = editingCompany.subscription?.validTill
+        ? new Date(editingCompany.subscription.validTill).toISOString().slice(0, 10)
+        : '';
+      if (values.subPlan !== currentPlan || values.subValidTill !== currentValidTill) {
+        if (values.subPlan !== 'trial' && !values.subValidTill) {
+          toast.error('Set a valid-till date for a paid plan');
+          setSavingEdit(false);
+          return;
+        }
+        await updateSubscriptionApi(editingCompany._id, {
+          plan: values.subPlan,
+          validTill: values.subValidTill || undefined,
+        });
+      }
+
       toast.success('Gym details updated');
       setEditingCompany(null);
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not update company');
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -154,13 +191,21 @@ export default function CompanyMaster() {
             action={<Button onClick={() => setModalOpen(true)}>Onboard Gym</Button>}
           />
         ) : (
-          <Table columns={['Gym', 'Code', 'Contact', 'Plan', 'Onboarded', 'Status', 'Actions']}>
+          <Table columns={['Gym', 'Code', 'Contact', 'Subscription', 'Onboarded', 'Status', 'Actions']}>
             {companies.map((c) => (
               <tr key={c._id} className="border-b border-black/[0.04] last:border-0">
                 <td className="px-4 py-3 text-[14px] font-medium text-ink">{c.name}</td>
                 <td className="px-4 py-3 text-[13px] text-ink-secondary">{c.code}</td>
                 <td className="px-4 py-3 text-[13px] text-ink-secondary">{c.contact?.email || '—'}</td>
-                <td className="px-4 py-3 text-[13px] text-ink-secondary capitalize">{c.subscription?.plan}</td>
+                <td className="px-4 py-3">
+                  <SubscriptionBadge subscription={c.subscription} />
+                  {c.subscription?.validTill && (
+                    <p className="text-[11px] text-ink-tertiary mt-1">
+                      {c.subscription.status === 'expired' ? 'Expired' : 'Till'}{' '}
+                      {new Date(c.subscription.validTill).toLocaleDateString()}
+                    </p>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-[12px] text-ink-tertiary">
                   {new Date(c.createdAt).toLocaleDateString()}
                 </td>
@@ -251,12 +296,6 @@ export default function CompanyMaster() {
             <Input label="City" {...editForm.register('city')} />
             <Input label="State" {...editForm.register('state')} />
           </div>
-          <Select label="Subscription Plan" {...editForm.register('plan')}>
-            <option value="trial">Trial</option>
-            <option value="basic">Basic</option>
-            <option value="pro">Pro</option>
-            <option value="enterprise">Enterprise</option>
-          </Select>
           <ImagePicker
             label="Logo"
             value={editForm.watch('logoUrl')}
@@ -273,7 +312,29 @@ export default function CompanyMaster() {
               className="h-11 w-20 rounded-lg border border-black/10 cursor-pointer"
             />
           </label>
-          <Button type="submit" className="w-full">
+
+          <div className="pt-2 border-t border-black/[0.06]">
+            <p className="text-[13px] font-medium text-ink-secondary mb-3 pt-3 flex items-center gap-1.5">
+              <CalendarClock size={14} /> Subscription
+            </p>
+            {editingCompany?.subscription?.status === 'expired' && (
+              <p className="text-[12px] text-red-500 mb-3">
+                This gym's subscription is expired and login is currently blocked. Set a new
+                valid-till date below to renew.
+              </p>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Select label="Plan" {...editForm.register('subPlan')}>
+                <option value="trial">Trial</option>
+                <option value="basic">Basic</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </Select>
+              <Input label="Valid Till" type="date" {...editForm.register('subValidTill')} />
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full" loading={savingEdit}>
             Save Changes
           </Button>
         </form>

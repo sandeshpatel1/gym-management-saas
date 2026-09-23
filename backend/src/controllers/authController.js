@@ -2,6 +2,7 @@ const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
 const Company = require('../models/Company');
 const generateToken = require('../utils/generateToken');
+const { isExpired, settleExpiredSubscriptions } = require('../utils/subscription');
 
 const PHONE_REGEX = /^[+]?[0-9]{10,15}$/;
 const URL_REGEX = /^https?:\/\/.+/i;
@@ -22,7 +23,7 @@ const login = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email: email.toLowerCase() })
     .select('+password')
-    .populate('company', 'name code branding isActive');
+    .populate('company', 'name code branding isActive subscription');
 
   if (!user || !(await user.matchPassword(password))) {
     res.status(401);
@@ -34,9 +35,21 @@ const login = asyncHandler(async (req, res) => {
     throw new Error('Your account has been deactivated. Contact your gym admin.');
   }
 
-  if (user.company && !user.company.isActive) {
-    res.status(403);
-    throw new Error('Your gym account is currently inactive. Contact support.');
+  if (user.company) {
+    if (!user.company.isActive) {
+      res.status(403);
+      throw new Error('Your gym account is currently inactive. Contact support.');
+    }
+
+    // Settle a subscription that quietly passed its validTill since the
+    // last time anyone touched it, then block login if it's expired.
+    if (isExpired(user.company)) {
+      await settleExpiredSubscriptions({ _id: user.company._id });
+      res.status(402);
+      throw new Error(
+        "Your gym's subscription has expired. Please contact your platform admin to renew."
+      );
+    }
   }
 
   user.lastLoginAt = new Date();
@@ -61,6 +74,7 @@ const login = asyncHandler(async (req, res) => {
             name: user.company.name,
             code: user.company.code,
             branding: user.company.branding, // dynamic logo/colors picked up immediately on login
+            subscription: user.company.subscription,
           }
         : null,
     },
@@ -128,7 +142,7 @@ const registerCompany = asyncHandler(async (req, res) => {
 const getMe = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id).populate(
     'company',
-    'name code branding isActive settings'
+    'name code branding isActive settings subscription'
   );
   res.json({ success: true, user });
 });
@@ -209,7 +223,7 @@ const updateMe = asyncHandler(async (req, res) => {
 
   const populated = await User.findById(user._id).populate(
     'company',
-    'name code branding isActive settings'
+    'name code branding isActive settings subscription'
   );
 
   res.json({
@@ -230,6 +244,7 @@ const updateMe = asyncHandler(async (req, res) => {
             name: populated.company.name,
             code: populated.company.code,
             branding: populated.company.branding,
+            subscription: populated.company.subscription,
           }
         : null,
     },

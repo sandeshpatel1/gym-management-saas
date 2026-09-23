@@ -5,6 +5,7 @@ const Member = require('../models/Member');
 const Attendance = require('../models/Attendance');
 const Company = require('../models/Company');
 const User = require('../models/User');
+const { settleExpiredSubscriptions } = require('../utils/subscription');
 
 // Normalizes pre-installment-tracking Payment docs by synthesizing a single
 // installment from `amount`/`paidAt` when the `installments` array is
@@ -25,23 +26,39 @@ const normalizeInstallmentsStage = {
 /**
  * @desc  Platform-wide overview for the superadmin dashboard: how many gyms
  *        exist and how many are active, staff headcount by role, total
- *        members across the whole platform, and the most recently
- *        onboarded gyms (with their onboarding date).
+ *        members across the whole platform, subscription renewal counts,
+ *        and the most recently onboarded gyms (with their onboarding date).
  * @route GET /api/reports/platform
  * @access Private (superadmin)
  */
 const getPlatformStats = asyncHandler(async (req, res) => {
-  const [totalCompanies, activeCompanies, usersByRoleAgg, totalMembers, recentCompanies] =
-    await Promise.all([
-      Company.countDocuments(),
-      Company.countDocuments({ isActive: true }),
-      User.aggregate([
-        { $match: { role: { $ne: 'superadmin' } } },
-        { $group: { _id: '$role', count: { $sum: 1 } } },
-      ]),
-      Member.countDocuments(),
-      Company.find().sort({ createdAt: -1 }).limit(6).select('name code createdAt isActive subscription'),
-    ]);
+  await settleExpiredSubscriptions();
+
+  const in7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const [
+    totalCompanies,
+    activeCompanies,
+    expiredSubscriptions,
+    expiringSoonSubscriptions,
+    usersByRoleAgg,
+    totalMembers,
+    recentCompanies,
+  ] = await Promise.all([
+    Company.countDocuments(),
+    Company.countDocuments({ isActive: true }),
+    Company.countDocuments({ 'subscription.status': 'expired' }),
+    Company.countDocuments({
+      'subscription.status': { $ne: 'expired' },
+      'subscription.validTill': { $exists: true, $ne: null, $lte: in7Days },
+    }),
+    User.aggregate([
+      { $match: { role: { $ne: 'superadmin' } } },
+      { $group: { _id: '$role', count: { $sum: 1 } } },
+    ]),
+    Member.countDocuments(),
+    Company.find().sort({ createdAt: -1 }).limit(6).select('name code createdAt isActive subscription'),
+  ]);
 
   const usersByRole = { owner: 0, manager: 0, trainer: 0 };
   usersByRoleAgg.forEach((r) => {
@@ -59,6 +76,8 @@ const getPlatformStats = asyncHandler(async (req, res) => {
       usersByRole,
       totalMembers,
       recentCompanies,
+      expiredSubscriptions,
+      expiringSoonSubscriptions,
     },
   });
 });

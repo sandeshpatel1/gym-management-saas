@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Building2, Users, ShieldCheck, Plus, UsersRound } from 'lucide-react';
+import { Building2, Users, ShieldCheck, Plus, UsersRound, CalendarClock } from 'lucide-react';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import StatCard from '../../components/ui/StatCard';
 import Card from '../../components/ui/Card';
@@ -9,17 +9,23 @@ import Badge from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/ui/EmptyState';
 import { getPlatformStatsApi } from '../../api/reports';
+import { getExpiringCompaniesApi } from '../../api/companies';
 
 export default function SuperAdminDashboard() {
   const [stats, setStats] = useState(null);
+  const [renewals, setRenewals] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await getPlatformStatsApi();
+        const [{ data }, { data: exp }] = await Promise.all([
+          getPlatformStatsApi(),
+          getExpiringCompaniesApi(7),
+        ]);
         setStats(data);
+        setRenewals(exp);
       } catch (err) {
         toast.error(err.response?.data?.message || 'Could not load platform overview');
       } finally {
@@ -27,6 +33,8 @@ export default function SuperAdminDashboard() {
       }
     })();
   }, []);
+
+  const renewalList = renewals ? [...renewals.expired, ...renewals.expiringSoon].slice(0, 5) : [];
 
   return (
     <DashboardLayout title="Platform Overview">
@@ -51,6 +59,27 @@ export default function SuperAdminDashboard() {
             <StatCard label="Total Members" value={stats?.totalMembers ?? 0} icon={Users} accent />
           </div>
 
+          {(stats?.expiredSubscriptions > 0 || stats?.expiringSoonSubscriptions > 0) && (
+            <Card className="p-5 mb-6 flex items-center justify-between border-amber-300/60 bg-amber-50/60">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0">
+                  <CalendarClock size={18} />
+                </div>
+                <div>
+                  <p className="text-[14px] font-semibold text-ink">
+                    {stats.expiredSubscriptions} expired · {stats.expiringSoonSubscriptions} expiring within 7 days
+                  </p>
+                  <p className="text-[12px] text-ink-tertiary">
+                    Expired gyms have been auto-downgraded to Trial and are blocked from logging in.
+                  </p>
+                </div>
+              </div>
+              <Button variant="secondary" onClick={() => navigate('/company-master')}>
+                Review
+              </Button>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <Card className="p-6 lg:col-span-1">
               <p className="text-[14px] font-semibold text-ink mb-4">Staff by Role</p>
@@ -67,6 +96,45 @@ export default function SuperAdminDashboard() {
             </Card>
 
             <Card className="p-6 lg:col-span-2">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[14px] font-semibold text-ink">Needs Renewal</p>
+                <Button size="sm" variant="secondary" onClick={() => navigate('/company-master')}>
+                  Open Company Master
+                </Button>
+              </div>
+              {renewalList.length === 0 ? (
+                <EmptyState
+                  icon={CalendarClock}
+                  title="Nothing needs renewal"
+                  description="No gyms are expired or expiring within 7 days."
+                />
+              ) : (
+                <div className="space-y-2">
+                  {renewalList.map((c) => (
+                    <div
+                      key={c._id}
+                      className="flex items-center justify-between py-2.5 border-b border-black/[0.04] last:border-0"
+                    >
+                      <div>
+                        <p className="text-[14px] font-medium text-ink">{c.name}</p>
+                        <p className="text-[12px] text-ink-tertiary">
+                          {c.code} · {c.subscription?.plan}
+                          {c.subscription?.validTill &&
+                            ` · till ${new Date(c.subscription.validTill).toLocaleDateString()}`}
+                        </p>
+                      </div>
+                      <Badge status={c.subscription?.status === 'expired' ? 'expired' : 'pending'}>
+                        {c.subscription?.status === 'expired' ? 'Expired' : 'Expiring soon'}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <Card className="p-6 lg:col-span-3">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[14px] font-semibold text-ink">Recently Onboarded Gyms</p>
                 <Button size="sm" variant="secondary" onClick={() => navigate('/company-master')}>

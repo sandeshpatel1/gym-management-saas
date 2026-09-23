@@ -62,6 +62,11 @@ const companySchema = new mongoose.Schema(
     subscription: {
       plan: { type: String, enum: ['trial', 'basic', 'pro', 'enterprise'], default: 'trial' },
       validTill: { type: Date },
+      // 'expired' means validTill has passed and the gym has been
+      // auto-downgraded to trial and blocked from logging in - see
+      // utils/subscription.js. Superadmin clears this back to 'active'
+      // by renewing (PUT /companies/:id/subscription).
+      status: { type: String, enum: ['active', 'expired'], default: 'active' },
     },
     paymentSettings: {
       upi: {

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const QRCode = require('qrcode');
 const PlatformSettings = require('../models/PlatformSettings');
 const { encrypt, decrypt, mask } = require('../utils/crypto');
+const { settleExpiredSubscriptions } = require('../utils/subscription');
 
 /**
  * @desc  Returns which gateway this gym has configured, with credentials
@@ -173,11 +174,14 @@ const removeBranch = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc  List all companies (platform-wide Company Master table)
+ * @desc  List all companies (platform-wide Company Master table). Settles
+ *        any subscriptions that quietly passed their validTill since the
+ *        last time anyone loaded this page, so the table is always accurate.
  * @route GET /api/companies
  * @access Private (superadmin)
  */
 const getCompanies = asyncHandler(async (req, res) => {
+  await settleExpiredSubscriptions();
   const companies = await Company.find().sort({ createdAt: -1 });
   res.json({ success: true, count: companies.length, data: companies });
 });
@@ -261,7 +265,11 @@ const getCompanyById = asyncHandler(async (req, res) => {
 });
 
 /**
- * @desc  Update company - name, contact, branding, settings, subscription.
+ * @desc  Update company - name, contact, branding, settings. Subscription
+ *        plan/validity is intentionally NOT accepted here — use
+ *        PUT /:id/subscription, which also resets an expired status back
+ *        to active (a plain field overwrite here would let the plan look
+ *        "changed" without ever clearing the block-login flag).
  * @route PUT /api/companies/:id
  * @access Private (superadmin, or owner of that company)
  */
@@ -271,7 +279,9 @@ const updateCompany = asyncHandler(async (req, res) => {
     throw new Error('You can only update your own company');
   }
 
-  const company = await Company.findByIdAndUpdate(req.params.id, req.body, {
+  const { subscription, ...safeBody } = req.body;
+
+  const company = await Company.findByIdAndUpdate(req.params.id, safeBody, {
     new: true,
     runValidators: true,
   });
@@ -301,6 +311,65 @@ const setCompanyStatus = asyncHandler(async (req, res) => {
     throw new Error('Company not found');
   }
   res.json({ success: true, data: company });
+});
+
+/**
+ * @desc  Superadmin sets/renews a gym's subscription plan and validity.
+ *        This is the explicit "renew" action: it always resets status
+ *        back to 'active', undoing any prior auto-expiry downgrade and
+ *        un-blocking login for that gym's staff.
+ * @route PUT /api/companies/:id/subscription
+ * @access Private (superadmin)
+ */
+const updateSubscription = asyncHandler(async (req, res) => {
+  const { plan, validTill } = req.body;
+  if (!plan || !['trial', 'basic', 'pro', 'enterprise'].includes(plan)) {
+    res.status(400);
+    throw new Error('A valid plan (trial, basic, pro, enterprise) is required');
+  }
+  if (plan !== 'trial' && !validTill) {
+    res.status(400);
+    throw new Error('A valid-till date is required for a paid plan');
+  }
+
+  const company = await Company.findById(req.params.id);
+  if (!company) {
+    res.status(404);
+    throw new Error('Company not found');
+  }
+
+  company.subscription = {
+    plan,
+    validTill: validTill ? new Date(validTill) : undefined,
+    status: 'active',
+  };
+  await company.save();
+
+  res.json({ success: true, data: company });
+});
+
+/**
+ * @desc  Gyms whose subscription is already expired, or will expire within
+ *        `days` (default 7) - powers the superadmin "renewals" list on the
+ *        platform dashboard. Settles anything that quietly passed its
+ *        validTill first, so the split below is always accurate.
+ * @route GET /api/companies/expiring?days=7
+ * @access Private (superadmin)
+ */
+const getExpiringCompanies = asyncHandler(async (req, res) => {
+  const days = Number(req.query.days) || 7;
+  const horizon = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+  await settleExpiredSubscriptions();
+
+  const candidates = await Company.find({
+    'subscription.validTill': { $exists: true, $ne: null, $lte: horizon },
+  }).sort({ 'subscription.validTill': 1 });
+
+  const expired = candidates.filter((c) => c.subscription.status === 'expired');
+  const expiringSoon = candidates.filter((c) => c.subscription.status !== 'expired');
+
+  res.json({ success: true, data: { expired, expiringSoon, days } });
 });
 
 /**
@@ -338,6 +407,8 @@ module.exports = {
   getCompanyById,
   updateCompany,
   setCompanyStatus,
+  updateSubscription,
+  getExpiringCompanies,
   getUpiQrPreview,
   getGatewaySettings,
   updateGatewaySettings,
