@@ -21,6 +21,12 @@ export default function MyBranchesOverview() {
 
   const { branches: myBranches } = useMyBranches();
 
+  const pick = (branch) => {
+    if (!branch.isActive) return; // inactive branches aren't selectable
+    startManaging({ id: branch._id, name: branch.name, code: branch.code, branding: branch.branding });
+    setOpen(false);
+  };
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -139,9 +145,14 @@ export default function MyBranchesOverview() {
                     <p className="text-[12px] text-ink-tertiary mb-4">Stats unavailable</p>
                   )}
 
-                  <Button variant="secondary" className="w-full" onClick={() => goToBranch(b)}>
-                    Open <ArrowRight size={14} />
-                  </Button>
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      disabled={!b.isActive}
+                      onClick={() => goToBranch(b)}
+                    >
+                      {b.isActive ? <>Open <ArrowRight size={14} /></> : 'Deactivated'}
+                    </Button>
                 </Card>
               );
             })}

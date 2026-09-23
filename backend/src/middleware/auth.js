@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('express-async-handler');
 const User = require('../models/User');
+const Company = require('../models/Company');
 
 /**
  * protect: verifies the JWT, loads the user, and attaches req.user.
@@ -71,7 +72,7 @@ const authorize = (...roles) => (req, res, next) => {
  * of this request only, so every existing controller (which just reads
  * req.user.company) keeps working completely unmodified.
  */
-const requireCompanyScope = (req, res, next) => {
+const requireCompanyScope = asyncHandler(async (req, res, next) => {
   const requestedCompanyId = req.query.company || req.headers['x-company-id'];
 
   if (req.user.role === 'superadmin') {
@@ -79,10 +80,14 @@ const requireCompanyScope = (req, res, next) => {
       res.status(400);
       throw new Error('Select a gym to manage first (missing company scope)');
     }
+    // Superadmin intentionally exempt from the active check below —
+    // they need access to a deactivated gym in order to reactivate it.
     req.user.company = requestedCompanyId;
     req.isSuperadminActingAs = true;
     return next();
   }
+
+  let targetCompanyId = req.user.company;
 
   if (requestedCompanyId && String(requestedCompanyId) !== String(req.user.company)) {
     if (req.user.role !== 'owner') {
@@ -96,16 +101,28 @@ const requireCompanyScope = (req, res, next) => {
       res.status(403);
       throw new Error('You do not have access to that branch');
     }
-    req.user.company = requestedCompanyId;
+    targetCompanyId = requestedCompanyId;
     req.isOwnerActingAsBranch = true;
-    return next();
   }
 
-  if (!req.user.company) {
+  if (!targetCompanyId) {
     res.status(403);
     throw new Error('This action requires an account scoped to a company');
   }
+
+  // NEW: the check that was missing — covers the home company AND every
+  // linked branch, on every single request, regardless of what the JWT
+  // or session cached earlier.
+  const company = await Company.findById(targetCompanyId).select('isActive name');
+  if (!company || !company.isActive) {
+    res.status(403);
+    throw new Error(
+      `${company?.name || 'This gym'} has been deactivated. Contact your platform admin.`
+    );
+  }
+
+  req.user.company = targetCompanyId;
   next();
-};
+});
 
 module.exports = { protect, authorize, requireCompanyScope };
