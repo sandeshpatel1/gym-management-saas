@@ -10,6 +10,7 @@ import CompanyLogo from '../../components/common/CompanyLogo';
 import EmptyState from '../../components/ui/EmptyState';
 import { useAuth } from '../../context/AuthContext';
 import { useMyBranches } from '../../hooks/useMyBranches';
+import { notifyDeactivatedGym } from '../../utils/deactivatedGymBus';
 import { getDashboardStatsApi } from '../../api/reports';
 
 export default function MyBranchesOverview() {
@@ -20,12 +21,6 @@ export default function MyBranchesOverview() {
   const [loading, setLoading] = useState(true);
 
   const { branches: myBranches } = useMyBranches();
-
-  const pick = (branch) => {
-    if (!branch.isActive) return; // inactive branches aren't selectable
-    startManaging({ id: branch._id, name: branch.name, code: branch.code, branding: branch.branding });
-    setOpen(false);
-  };
 
   useEffect(() => {
     (async () => {
@@ -50,7 +45,7 @@ export default function MyBranchesOverview() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [myBranches]);
 
   const totals = branches.reduce(
     (acc, b) => {
@@ -67,6 +62,10 @@ export default function MyBranchesOverview() {
   );
 
   const goToBranch = (b) => {
+    if (!b.isActive) {
+      notifyDeactivatedGym(`${b.name} has been deactivated. Contact your platform admin to reactivate it.`);
+      return;
+    }
     startManaging({ id: b._id, name: b.name, code: b.code, branding: b.branding });
     navigate('/dashboard');
   };
@@ -121,7 +120,7 @@ export default function MyBranchesOverview() {
                       <p className="text-[11px] text-ink-tertiary dark:text-zinc-500">
                         {b.code}
                         {b.contact?.city ? ` · ${b.contact.city}` : ''}
-                        {!b.isActive && <span className="text-red-500 ml-1">· inactive</span>}
+                        {!b.isActive && <span className="text-red-500 ml-1">· deactivated</span>}
                       </p>
                     </div>
                   </div>
@@ -145,14 +144,13 @@ export default function MyBranchesOverview() {
                     <p className="text-[12px] text-ink-tertiary mb-4">Stats unavailable</p>
                   )}
 
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      disabled={!b.isActive}
-                      onClick={() => goToBranch(b)}
-                    >
-                      {b.isActive ? <>Open <ArrowRight size={14} /></> : 'Deactivated'}
-                    </Button>
+                  <Button
+                    variant="secondary"
+                    className={`w-full ${!b.isActive ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={() => goToBranch(b)}
+                  >
+                    {b.isActive ? <>Open <ArrowRight size={14} /></> : 'Deactivated'}
+                  </Button>
                 </Card>
               );
             })}

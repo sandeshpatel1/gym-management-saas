@@ -27,6 +27,7 @@ import PlatformPaymentSettings from './pages/superadmin/PlatformPaymentSettings'
 import ImpersonationLogs from './pages/superadmin/ImpersonationLogs';
 import AddBranch from './pages/company/AddBranch';
 import MyBranchesOverview from './pages/dashboard/MyBranchesOverview';
+import DeactivatedGymModal from './components/common/DeactivatedGymModal';
 
 function RootRedirect() {
   const { user, loading } = useAuth();
@@ -37,6 +38,8 @@ function RootRedirect() {
 
 export default function App() {
   return (
+    <>
+    <DeactivatedGymModal />
     <Routes>
       <Route path="/login" element={<Login />} />
 
@@ -233,5 +236,6 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }

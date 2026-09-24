@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronsUpDown, Check, MapPin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useMyBranches } from '../../hooks/useMyBranches';
+import { notifyDeactivatedGym } from '../../utils/deactivatedGymBus';
 import CompanyLogo from './CompanyLogo';
 
 /**
@@ -12,7 +13,9 @@ import CompanyLogo from './CompanyLogo';
  * this component is purely for switching between ones already granted.
  * Switching reuses the same session mechanism the superadmin's "Manage
  * this gym" flow uses (AuthContext's startManaging), so every existing
- * page automatically respects it.
+ * page automatically respects it. A deactivated branch stays visible
+ * (greyed out) so the owner knows it exists, but clicking it shows the
+ * "contact admin" popup instead of switching into it.
  */
 export default function BranchSwitcher() {
   const { user, effectiveCompany, startManaging } = useAuth();
@@ -31,6 +34,12 @@ export default function BranchSwitcher() {
   if (user?.role !== 'owner' || branches.length <= 1) return null;
 
   const pick = (branch) => {
+    if (!branch.isActive) {
+      notifyDeactivatedGym(
+        `${branch.name} has been deactivated. Contact your platform admin to reactivate it.`
+      );
+      return;
+    }
     startManaging({
       id: branch._id,
       name: branch.name,
@@ -72,7 +81,11 @@ export default function BranchSwitcher() {
                     <button
                       key={b._id}
                       onClick={() => pick(b)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] text-left press-feedback"
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left press-feedback ${
+                        b.isActive
+                          ? 'hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
+                          : 'opacity-50 cursor-not-allowed'
+                      }`}
                     >
                       <CompanyLogo company={b} size={26} />
                       <div className="min-w-0 flex-1">
@@ -86,7 +99,7 @@ export default function BranchSwitcher() {
                               {b.contact?.state ? `, ${b.contact.state}` : ''}
                             </>
                           )}
-                          {!b.isActive && <span className="text-red-500 ml-1">· inactive</span>}
+                          {!b.isActive && <span className="text-red-500 ml-1">· deactivated</span>}
                         </p>
                       </div>
                       {isCurrent && <Check size={14} className="text-brand shrink-0" />}

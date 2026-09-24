@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { notifyDeactivatedGym } from '../utils/deactivatedGymBus';
 
 const axiosClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -31,6 +32,17 @@ axiosClient.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+
+    // A gym/branch was deactivated - possibly mid-session, by superadmin,
+    // while this login was already inside it. Surface a blocking "contact
+    // admin" popup instead of a toast that's easy to miss. The calling
+    // page's own .catch still runs normally afterwards (any extra toast it
+    // shows is harmless alongside this).
+    const message = err.response?.data?.message;
+    if (err.response?.status === 403 && /deactivated/i.test(message || '')) {
+      notifyDeactivatedGym(message);
+    }
+
     return Promise.reject(err);
   }
 );
